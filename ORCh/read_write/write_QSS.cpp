@@ -713,7 +713,7 @@ write << "*/" << endl << endl;
 
          if ((dynamic_cast <ThreeBody *> (listReactions[j])))
          {
-            if ((dynamic_cast <FalloffR *> (listReactions[j])) == false)
+            if (!(dynamic_cast <FalloffR *> (listReactions[j])))
             {
                write << " *CTB[" << count_threebody << "]";
             }
@@ -761,7 +761,7 @@ write << "*/" << endl << endl;
 
          if ((dynamic_cast <ThreeBody *> (listReactions[j])))
          {
-            if ((dynamic_cast <FalloffR *> (listReactions[j])) == false)
+            if (!(dynamic_cast <FalloffR *> (listReactions[j])))
             {
                write << " *CTB[" << count_threebody << "]";
             }

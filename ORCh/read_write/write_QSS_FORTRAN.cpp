@@ -622,7 +622,7 @@ void Write_QSS_FORTRAN::Write_QSS_file_in_FORTRAN(string mech, string write_mech
 
       if ((dynamic_cast <ThreeBody *> (listReactions[j])))
       {
-         if ((dynamic_cast <FalloffR *> (listReactions[j])) == false)
+         if (!(dynamic_cast <FalloffR *> (listReactions[j])))
          {
             write << " *CTB(" << count_threebody << ")";
          }
