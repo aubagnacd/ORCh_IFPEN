@@ -1,5 +1,3 @@
-
-
 all: CANTERA DRGEP LUMPING MAIN OPTIMISATION READ_WRITE TOOLS EMST
 
 CANTERA:
@@ -34,8 +32,10 @@ EMST:
      
 	cd emst; make
 
+EXE:
         
-
+	cd exe; make
+        
 clean:
 
 	cd cantera; make clean
@@ -46,6 +46,7 @@ clean:
 	cd read_write; make clean
 	cd tools; make clean
 	cd emst; make clean
+	cd exe; make clean
 
 
 
