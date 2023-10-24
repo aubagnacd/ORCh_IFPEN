@@ -3,7 +3,7 @@
 all: Main
 
 Main: 
-	mpic++ -w -std=c++11 -L$(MPI_LIB) -I$(BOOSTPATH) -I$(ORCH_BASE)/Cantera/include -L$(CT_LIB) -I$(HDF5_INC) -L$(HDF5_LIB) tools.cpp gnuplot.cpp  outputs.cpp fitness_criteria.cpp -c -g -O3 -Wall -luser -loneD -lzeroD -lequil -lkinetics -ltransport -lthermo -lctnumerics -lctmath -lconverters -lctbase -lctcxx -lcvode -lctf2c -lctf2c -lctlapack -lctblas -lm -lhdf5 -lhdf5_hl
+	mpic++ -I$(ORCH_BASE)/Cantera/include tools.cpp gnuplot.cpp  outputs.cpp fitness_criteria.cpp -c -O3
 
 clean:
 	rm *.o

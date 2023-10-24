@@ -3,7 +3,7 @@
 all: Main
 
 Main: 
-	mpic++ -w -std=c++11 -L$(MPI_LIB) -I$(BOOSTPATH) -I$(ORCH_BASE)/Cantera/include -L$(CT_LIB) -I$(HDF5_INC) -L$(TENSORFLOW_CAPI_PATH)/lib -I$(TENSORFLOW_CAPI_PATH)/include mainDRGEPSpecies.cpp mainDRGEPReactions.cpp mainComputeTrajectories.cpp mainLumping.cpp -c -g -O3 -Wall -luser -loneD -lzeroD -lequil -lkinetics -ltransport -lthermo -lctnumerics -lctmath -lconverters -lctbase -lctcxx -lcvode -lctf2c -lctf2c -lctlapack -lctblas -lm -lhdf5 -lhdf5_hl -ltensorflow -ltensorflow_framework
+	mpic++ -I$(ORCH_BASE)/Cantera/include -I$(TENSORFLOW_CAPI_PATH)/include mainDRGEPSpecies.cpp mainDRGEPReactions.cpp mainComputeTrajectories.cpp mainLumping.cpp -c -O3
 
 clean:
 	rm *.o

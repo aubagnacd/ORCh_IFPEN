@@ -1,4 +1,4 @@
-all: CANTERA DRGEP LUMPING MAIN OPTIMISATION READ_WRITE TOOLS EMST
+all: CANTERA DRGEP LUMPING MAIN OPTIMISATION READ_WRITE TOOLS EMST CPPFLOW
 
 CANTERA:
              
@@ -32,9 +32,9 @@ EMST:
      
 	cd emst; make
 
-EXE:
+CPPFLOW:
         
-	cd exe; make
+	cd cppflow/src; make
         
 clean:
 
@@ -46,7 +46,4 @@ clean:
 	cd read_write; make clean
 	cd tools; make clean
 	cd emst; make clean
-	cd exe; make clean
-
-
-
+	cd cppflow/src; make clean
