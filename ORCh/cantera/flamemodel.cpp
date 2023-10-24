@@ -34,9 +34,9 @@ MultipleInlet::~MultipleInlet() //Destructeur
 
 
 Characteristics_MultipleInlet::Characteristics_MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat,
-   double tau_t, double delta_t, int NbIterations, bool BurnedGases) //Constructeur
+   double tau_t, double delta_t, int NbIterations, bool BurnedGases, bool EMST) //Constructeur
    :MultipleInlet(Temperature, Pressure, flowRate, X_Species, Y_Species, liquid, DropletsDiameter, Tau_vj, density_liquid, EvaporationLatentHeat),
-    m_tau_t(tau_t), m_delta_t(delta_t), m_NbIterations(NbIterations), m_BurnedGases(BurnedGases)   
+    m_tau_t(tau_t), m_delta_t(delta_t), m_NbIterations(NbIterations), m_BurnedGases(BurnedGases), m_EMST(EMST)   
 {}
 
 Characteristics_MultipleInlet::~Characteristics_MultipleInlet() //Destructeur

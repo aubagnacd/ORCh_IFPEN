@@ -50,18 +50,18 @@ class computeMultipleInlet
                           vector<vector<vector<double> > > &Ym_Trajectories_store, vector<vector<vector<double> > > &Production_Trajectories_ref,
                           vector<vector<vector<double> > > &Consumption_Trajectories_ref, vector<vector<double> > &T_Trajectories_store, vector<double> &time_store, vector<bool> &SpeciesIntoReactants);
 
-   virtual void Next_Time_Step_with_drgep(string mech, string mech_desc, vector<bool> Targets, double P, double *Ym, double &Hm, double &Tm, double delta_t,
-                          vector<vector<double> > &R_AD_Trajectories, vector<vector<double> > &max_j_on_Target, string  step, int n, double time);
+   virtual void Next_Time_Step_with_drgep(vector<bool> Targets, double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t,
+                          vector<vector<double> > &R_AD_Trajectories, vector<vector<double> > &max_j_on_Target, string step);
 
-   virtual void Next_Time_Step(string mech, string mech_desc, double P, double *Ym, double &Hm, double &Tm, double delta_t);
+   virtual void Next_Time_Step(double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t);
 
-   virtual void Next_Time_Step(string mech, string mech_desc, double P, double *Ym, double &Hm, double &Tm, double delta_t,
+   virtual void Next_Time_Step(double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t,
                     vector<vector<vector<double> > > &Production_Trajectories_ref, vector<vector<vector<double> > > &Consumption_Trajectories_ref, int nInlet, int nLine);
 
-   virtual void getMixedGasesComposition(string mech, string mech_desc, vector<MultipleInlet*> listInlets, string step);
+   virtual void getMixedGasesComposition(vector<MultipleInlet*> listInlets, string step);
 
-   virtual void Reacting(vector<Particle*> &listParticles, string mech, string mech_desc, int nsp, double dt, double Pressure);
-   virtual void ReactingParallel(vector<Particle*> &listParticles, string mech, string mech_desc, int nsp, double dt, double Pressure);
+   virtual void Reacting(vector<Particle*> &listParticles, int nsp, double dt, double Pressure);
+   virtual void ReactingParallel(vector<Particle*> &listParticles, int nsp, double dt, double Pressure);
 
 
 
@@ -70,7 +70,10 @@ class computeMultipleInlet
    virtual ~computeMultipleInlet();
 
    private:
+	int Ifi_rank, Ila_rank, nb_var_loc, nproc;
+	int *RecvCounts, *Disp;
 
+	IdealGasMix *mixture;
 };
 
 

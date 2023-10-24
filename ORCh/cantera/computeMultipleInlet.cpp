@@ -48,7 +48,7 @@ bool file_exists(char *filename)
 
 
 /* Print to file - Source term Deterministic */
-void SaveToFile_wDeter(double *wDeter_T, double **wDeter_species, int nsp, int nbInlets, int i, double delta_t, vector<Species_ORCh*> listSpecies, int rank)
+void SaveToFile_wDeter(double *wDeter_T, double **wDeter_species, int nsp, int nbInlets, int i, double delta_t, int rank, IdealGasMix *mixture)
 {
 // Print the Deterministic source term to CFD_results/sourceTermDeter_Inlet*.txt
 
@@ -84,7 +84,7 @@ void SaveToFile_wDeter(double *wDeter_T, double **wDeter_species, int nsp, int n
 				sourceTermDeter_Inlet0 << "2:T	";
 				for (int k=0; k<nsp; k++)
 				{
-					sourceTermDeter_Inlet0 << k+3 << ":" << listSpecies[k]->m_Name << "	";
+					sourceTermDeter_Inlet0 << k+3 << ":" << mixture->speciesName(k) << "	";
 				}
 				sourceTermDeter_Inlet0 << endl;			
 
@@ -128,7 +128,7 @@ void SaveToFile_wDeter(double *wDeter_T, double **wDeter_species, int nsp, int n
 				sourceTermDeter_Inlet1 << "2:T	";
 				for (int k=0; k<nsp; k++)
 				{
-					sourceTermDeter_Inlet1 << k+3 << ":" << listSpecies[k]->m_Name << "	";
+					sourceTermDeter_Inlet1 << k+3 << ":" << mixture->speciesName(k) << "	";
 				}
 				sourceTermDeter_Inlet1 << endl;			
 
@@ -262,7 +262,7 @@ void advanceANN(std::vector<float> &child_MeanINPUTLoad, std::vector<float> &chi
                 std::vector<float> &input_childLocalStandardized, cv::Mat input_childLocalStandardized_Mat,
                 cv::Mat inputPCA, std::vector<float> &inputPCA_Vec,
                 std::vector<float> &outputStandardizeANN_Vec,
-                vector<Species_ORCh*> listSpecies)
+                IdealGasMix *mixture)
 {
     // LOCAL INPUT Standardize
     // Standardize T
@@ -274,7 +274,7 @@ void advanceANN(std::vector<float> &child_MeanINPUTLoad, std::vector<float> &chi
         input_childLocalStandardized[kANN] = Ym[kANN] - child_MeanINPUTLoad[kANN];
         input_childLocalStandardized[kANN] /= child_StdINPUTLoad[kANN];
         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-        if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+        if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
     }
     
     
@@ -327,7 +327,7 @@ void advanceANN(std::vector<float> &child_MeanINPUTLoad, std::vector<float> &chi
         Ym[kANN] = Ym[kANN] + outputStandardizeANN_Vec[kANN];
         Ym[kANN] = std::min(std::max(Ym[kANN],minAftREACTORLoad[kANN]),maxAftREACTORLoad[kANN]); // Check if <minValue or >maxValue
         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-        if(listSpecies[kANN]->m_Name == "N2")
+        if(mixture->speciesName(kANN) == "N2")
             cout << "Warning : N2 in the ANN!!!" << endl;
     }
 }
@@ -343,7 +343,7 @@ void advanceANN_withoutPCA(std::vector<float> &child_MeanINPUTLoad, std::vector<
                 int &numVarANN, int &nsp,
                 std::vector<float> &input_childLocalStandardized, 
                 std::vector<float> &outputStandardizeANN_Vec,
-                vector<Species_ORCh*> listSpecies)
+                IdealGasMix *mixture)
 {
     // LOCAL INPUT Standardize
     // Standardize T
@@ -355,7 +355,7 @@ void advanceANN_withoutPCA(std::vector<float> &child_MeanINPUTLoad, std::vector<
         input_childLocalStandardized[kANN] = Ym[kANN] - child_MeanINPUTLoad[kANN];
         input_childLocalStandardized[kANN] /= child_StdINPUTLoad[kANN];
         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-        if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+        if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
     }
     
     
@@ -413,7 +413,7 @@ void advanceANN_withoutPCA(std::vector<float> &child_MeanINPUTLoad, std::vector<
         Ym[kANN] = Ym[kANN] + outputStandardizeANN_Vec[kANN];
         Ym[kANN] = std::min(std::max(Ym[kANN],minAftREACTORLoad[kANN]),maxAftREACTORLoad[kANN]); // Check if <minValue or >maxValue
         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-        if(listSpecies[kANN]->m_Name == "N2")
+        if(mixture->speciesName(kANN) == "N2")
             cout << "Warning : N2 in the ANN!!!" << endl;
     }
 }
@@ -439,36 +439,54 @@ void computeMultipleInlet::getMultipleInlet(
    vector<bool> &SpeciesIntoReactants)
 {
 
-   //Treat parallel stuff
-   int rank, nb_processus;
-
-   if (step != "Optimisation")
-       {
-       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-       MPI_Comm_size(MPI_COMM_WORLD, &nb_processus);
-       }
-    else
-       rank = 0;
-
-
-
-   IdealGasMix *mixture  = new IdealGasMix(mech,mech_desc);
+   mixture  = new IdealGasMix(mech,mech_desc);
    int nsp = mixture->nSpecies();
    int nbInlets = listInlets.size();
 
-   getMixedGasesComposition(mech, mech_desc, listInlets, step);
-
-   
-
-   vector<Species_ORCh*> listSpecies;
-   vector<Reaction_ORCh*> listReactions;
-
-   Read *r = new Read();
-   r->Read_species(mech, listSpecies);
-   r->Read_reactions(mech, listReactions);
+   getMixedGasesComposition(listInlets, step);
 
    double t = 0.0; //Initial computational time
    int nTot = 0; //Total number of particles
+
+   //Treat parallel stuff
+   int rank, nb_processus;
+
+   	if (step != "Optimisation") {
+		//
+		// DAK : initialize Ifi_rank and Ila_rank (particles to be computed by this proc)
+		//
+		MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+		
+		int Ifi = 0;
+		int Ila = 0;
+		RecvCounts = new int[nproc];
+		Disp = new int[nproc];
+		for (int r=0; r<nproc; r++) Disp[r] = 0;
+		
+		for (int r=0; r<nproc; r++)
+		{
+			if (r < nTot%nproc)
+			{
+				Ifi = (nTot/nproc)*r + r;
+				Ila = (nTot/nproc)*r + (nTot/nproc) + r + 1;
+			}
+			else
+			{
+				Ifi = (nTot/nproc)*r + nTot%nproc;
+				Ila = (nTot/nproc)*r + (nTot/nproc) + nTot%nproc;
+			}
+			
+			RecvCounts[r] = (Ila-Ifi)*(nsp+1); //for Yks and H and T
+			for (int rb=r; rb<nproc-1; rb++) Disp[rb+1] += (Ila-Ifi)*(nsp+1);
+			
+			if (rank == r)
+			{
+				Ifi_rank = Ifi;
+				Ila_rank = Ila;
+				nb_var_loc = (Ila-Ifi)*(nsp+1);
+			}
+		}
+	}
 
    double Particle_flowRate = 0.001; //elementary mass flow rate
    vector<int> nbParticles (nbInlets, 0); //Number of particles per inlet
@@ -649,7 +667,7 @@ void computeMultipleInlet::getMultipleInlet(
    vector<double> Zm_Trajectories(nbInlets, 0.0);
    vector<double> Hm_inletIni(nbInlets, 0.0); // Save initial enthalpy of each inlet - Huu-Tri Nguyen - 16.01.2020
 
-   double *Ym = new double[nsp];
+   vector<double> Ym(nsp,0.0);
    double Hm = 0.0;
    double Zm = 0.0;
    double Tm = 0.0;
@@ -668,16 +686,14 @@ void computeMultipleInlet::getMultipleInlet(
    double Diameter_init; 
    double tau_vj;
    for (int n=0; n<nbInlets; n++)
-   {
-      IdealGasMix *InletMixture = new IdealGasMix(mech, mech_desc);
-      
+   {      
       if (listInlets[n]->m_X_Species != "")
       {
          if (rank == 0)
          {
          cout << "Set the mole fraction of inlet " << n << endl;
          }
-         InletMixture->setState_TPX(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_X_Species);
+         mixture->setState_TPX(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_X_Species);
       }
       else if (listInlets[n]->m_Y_Species != "")
       {
@@ -685,15 +701,15 @@ void computeMultipleInlet::getMultipleInlet(
          {
             cout << "Set the mass fraction of inlet " << n << endl;
          }
-         InletMixture->setState_TPY(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_Y_Species);
+         mixture->setState_TPY(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_Y_Species);
       }
 
-      InletMixture->getMassFractions(Ym);
-      Hm  = InletMixture->enthalpy_mass();
+      mixture->getMassFractions(&Ym[0]);
+      Hm  = mixture->enthalpy_mass();
       vector<double> Y_transfer (nsp, 0.0);
       for (int k=0; k<nsp; k++)
          Y_transfer[k] = Ym[k];
-      density = InletMixture->density();
+      density = mixture->density();
 
       for (int k=0; k<nsp; k++)
       {
@@ -767,17 +783,17 @@ void computeMultipleInlet::getMultipleInlet(
    vector<double> BoilingEnthalpy (nsp, 0.0);
    for (int k=0; k<nsp; k++)
    {
-      IdealGasMix *InletMixture = new IdealGasMix(mech, mech_desc);
-      double *Ym = new double[nsp];
+      double *Ymb = new double[nsp];
       for (int kbis=0; kbis<nsp; kbis++)
       {
          if (k != kbis)
-            Ym[kbis] = 0;
+            Ymb[kbis] = 0;
          else
-            Ym[kbis] = 1;
+            Ymb[kbis] = 1;
       }
-      InletMixture->setState_TPY(listInlets[1]->m_Temperature, listInlets[1]->m_Pressure, Ym);
-      BoilingEnthalpy[k] = InletMixture->enthalpy_mass();
+      mixture->setState_TPY(listInlets[1]->m_Temperature, listInlets[1]->m_Pressure, Ymb);
+      BoilingEnthalpy[k] = mixture->enthalpy_mass();
+      delete[] Ymb;
    }
 
 
@@ -6241,7 +6257,7 @@ void computeMultipleInlet::getMultipleInlet(
 					mean_dataParticle << "#Time(s)	"; 
 					for (int k=0; k<nsp; k++)
 					{
-						mean_dataParticle << "Mean_Ym_" << listSpecies[k]->m_Name << "	";
+						mean_dataParticle << "Mean_Ym_" << mixture->speciesName(k) << "	";
 					}
 					mean_dataParticle << "Mean_Hm	";
 					mean_dataParticle << "Mean_Tm(K)" << endl;
@@ -6516,12 +6532,12 @@ void computeMultipleInlet::getMultipleInlet(
 				// Zc = (No_atomsC_inSpecie * Weight_of_C * Y_species) / Weight_of_specie)
       				for (int k=0;k<nsp;k++)
       				{
-         				if (listSpecies[k]->m_C != 0)
-            					Zc += listSpecies[k]->m_C*W_C*Y[k]/( listSpecies[k]->m_C*W_C +  listSpecies[k]->m_H*W_H + listSpecies[k]->m_O*W_O);
-         				if (listSpecies[k]->m_O != 0)
-         					Zo += listSpecies[k]->m_O*W_O*Y[k]/( listSpecies[k]->m_C*W_C +  listSpecies[k]->m_H*W_H +  listSpecies[k]->m_O*W_O);
-         				if (listSpecies[k]->m_H != 0)
-         					Zh += listSpecies[k]->m_H*W_H*Y[k]/( listSpecies[k]->m_C*W_C +  listSpecies[k]->m_H*W_H +  listSpecies[k]->m_O*W_O);
+         				if (mixture->species(k)->composition["C"] != 0)
+            					Zc += mixture->species(k)->composition["C"]*W_C*Y[k]/( mixture->species(k)->composition["C"]*W_C +  mixture->species(k)->composition["H"]*W_H + mixture->species(k)->composition["O"]*W_O);
+         				if (mixture->species(k)->composition["O"] != 0)
+         					Zo += mixture->species(k)->composition["O"]*W_O*Y[k]/( mixture->species(k)->composition["C"]*W_C +  mixture->species(k)->composition["H"]*W_H +  mixture->species(k)->composition["O"]*W_O);
+         				if (mixture->species(k)->composition["H"] != 0)
+         					Zh += mixture->species(k)->composition["H"]*W_H*Y[k]/( mixture->species(k)->composition["C"]*W_C +  mixture->species(k)->composition["H"]*W_H +  mixture->species(k)->composition["O"]*W_O);
       				}				
 
 
@@ -6750,16 +6766,16 @@ void computeMultipleInlet::getMultipleInlet(
 
          if (step == "DRGEP_Species" || step == "DRGEP_Reactions")
          {
-            Next_Time_Step_with_drgep(mech, mech_desc, Targets, Pressure, Ym, Hm, Tm, delta_t, R_AD_Trajectories[n], max_j_on_Target, step, n, t);
+            Next_Time_Step_with_drgep(Targets, Pressure, Ym, Hm, Tm, delta_t, R_AD_Trajectories[n], max_j_on_Target, step);
          }
          else if (step == "computeQSSCriteria")
          {
-            Next_Time_Step(mech, mech_desc, Pressure, Ym, Hm, Tm, delta_t, Production_Trajectories_ref, Consumption_Trajectories_ref, n, i);
+            Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t, Production_Trajectories_ref, Consumption_Trajectories_ref, n, i);
          }
          else
          {
 
-            Next_Time_Step(mech, mech_desc, Pressure, Ym, Hm, Tm, delta_t);
+            Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t);
              
              // Huu-Tri TEST - 20210206
             if(rank==0)
@@ -6806,7 +6822,7 @@ void computeMultipleInlet::getMultipleInlet(
 		}
 	
 		// 3rd step: Save to file
-		SaveToFile_wDeter(wDeter_T, wDeter_species, nsp, nbInlets, i, delta_t, listSpecies, rank);
+		SaveToFile_wDeter(wDeter_T, wDeter_species, nsp, nbInlets, i, delta_t, rank, mixture);
 
 	
 		// Free w_species memory (array pointer should be deleted after use)		 
@@ -7300,7 +7316,7 @@ void computeMultipleInlet::getMultipleInlet(
                 input_GlobalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - GLOBAL_meanScale[kANN];
                 input_GlobalStandardized[kANN] /= GLOBAL_stdScale[kANN];
                 //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
             }
 
         // CLASSIFIER GLOBAL: Caculate the distance : Eucledian (Kmeans) or Projection parition (LPCA)
@@ -7333,7 +7349,7 @@ void computeMultipleInlet::getMultipleInlet(
                     input_parentLocalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - parentCluster0_meanScaleINPUT[kANN];
                     input_parentLocalStandardized[kANN] /= parentCluster0_stdScaleINPUT[kANN];
                     //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                    if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                    if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
                 }
                 
                 // CLASSIFIER LOCAL PARENT: Caculate the distance : Eucledian (Kmeans) or Projection parition (LPCA)
@@ -7428,8 +7444,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         
@@ -7447,8 +7462,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_2
@@ -7465,8 +7479,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_3
@@ -7483,8 +7496,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
 
                     // Cluster 0_4
@@ -7501,8 +7513,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_5
@@ -7519,8 +7530,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_6
@@ -7537,8 +7547,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_7
@@ -7555,8 +7564,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_8
@@ -7573,8 +7581,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_9
@@ -7591,8 +7598,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_10
@@ -7609,8 +7615,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_11
@@ -7627,8 +7632,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                     // Cluster 0_12
@@ -7645,8 +7649,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         // Cluster 0_13
@@ -7663,8 +7666,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         // Cluster 0_14
@@ -7681,8 +7683,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         // Cluster 0_15
@@ -7699,8 +7700,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         // Cluster 0_16
@@ -7717,8 +7717,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                         // Cluster 0_17
@@ -7735,8 +7734,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                   
                         // Cluster 0_18
@@ -7753,8 +7751,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                   
                         // Cluster 0_19
@@ -7771,8 +7768,7 @@ void computeMultipleInlet::getMultipleInlet(
                                    listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                    numVarANN, nsp,
                                    input_childLocalStandardized, 
-                                   outputStandardizeANN_Vec,
-                                   listSpecies);
+                                   outputStandardizeANN_Vec, mixture);
                         break;
                         
                 } //END switch(indexChildCluster) parentCluster0
@@ -7793,7 +7789,7 @@ void computeMultipleInlet::getMultipleInlet(
                     input_parentLocalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - parentCluster1_meanScaleINPUT[kANN];
                     input_parentLocalStandardized[kANN] /= parentCluster1_stdScaleINPUT[kANN];
                     //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                    if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                    if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
                 }
                 
                 // CLASSIFIER LOCAL PARENT: Caculate the distance : Eucledian (Kmeans) or Projection parition (LPCA)
@@ -7832,7 +7828,7 @@ void computeMultipleInlet::getMultipleInlet(
                         input_childLocalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - cluster1_0_meanScaleINPUT[kANN];
                         input_childLocalStandardized[kANN] /= cluster1_0_stdScaleINPUT[kANN];
                         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                        if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                        if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
                     }
 
                     
@@ -7968,8 +7964,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_0_1
@@ -7986,8 +7981,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_0_2
@@ -8004,8 +7998,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_0_3
@@ -8022,8 +8015,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_0_4
@@ -8040,8 +8032,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_5
@@ -8058,8 +8049,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_6
@@ -8076,8 +8066,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_7
@@ -8094,8 +8083,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_8
@@ -8112,8 +8100,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_9
@@ -8130,8 +8117,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_10
@@ -8148,8 +8134,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_11
@@ -8166,8 +8151,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_12
@@ -8184,8 +8168,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_13
@@ -8202,8 +8185,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_14
@@ -8220,8 +8202,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_15
@@ -8238,8 +8219,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_16
@@ -8256,8 +8236,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_17
@@ -8274,8 +8253,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_18
@@ -8292,8 +8270,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_19
@@ -8310,8 +8287,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
             
                             // Cluster 1_0_20
@@ -8328,8 +8304,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_21
@@ -8346,8 +8321,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_22
@@ -8364,8 +8338,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_23
@@ -8382,8 +8355,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_24
@@ -8400,8 +8372,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_25
@@ -8418,8 +8389,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_26
@@ -8436,8 +8406,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_27
@@ -8454,8 +8423,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_28
@@ -8472,8 +8440,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_29
@@ -8490,8 +8457,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_30
@@ -8508,8 +8474,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_31
@@ -8526,8 +8491,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_32
@@ -8544,8 +8508,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_33
@@ -8562,8 +8525,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_34
@@ -8580,8 +8542,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_35
@@ -8598,8 +8559,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_36
@@ -8616,8 +8576,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_37
@@ -8634,8 +8593,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_38
@@ -8652,8 +8610,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_0_39
@@ -8670,8 +8627,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -8691,7 +8647,7 @@ void computeMultipleInlet::getMultipleInlet(
                         input_childLocalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - cluster1_1_meanScaleINPUT[kANN];
                         input_childLocalStandardized[kANN] /= cluster1_1_stdScaleINPUT[kANN];
                         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                        if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                        if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
                     }
                     
                     
@@ -8779,8 +8735,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_1_1
@@ -8797,8 +8752,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_1_2
@@ -8815,8 +8769,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_3
@@ -8833,8 +8786,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_1_4
@@ -8851,8 +8803,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_5
@@ -8869,8 +8820,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_6
@@ -8887,8 +8837,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_7
@@ -8905,8 +8854,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -8924,8 +8872,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_9
@@ -8942,8 +8889,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_10
@@ -8960,8 +8906,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_11
@@ -8978,8 +8923,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_12
@@ -8996,8 +8940,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -9015,8 +8958,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_1_14
@@ -9033,8 +8975,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -9054,7 +8995,7 @@ void computeMultipleInlet::getMultipleInlet(
                         input_childLocalStandardized[kANN] = listParticles[p]->m_Yk_gas[kANN] - cluster1_2_meanScaleINPUT[kANN];
                         input_childLocalStandardized[kANN] /= cluster1_2_stdScaleINPUT[kANN];
                         //Cross-check if there is N2 inside, if yes, should move N2 to the end of the scheme
-                        if(listSpecies[kANN]->m_Name == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
+                        if(mixture->speciesName(kANN) == "N2") {cout << "Warning : N2 in the ANN!!!" << endl;}
                     }
                     
                     
@@ -9140,8 +9081,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_2_1
@@ -9158,8 +9098,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_2
@@ -9176,8 +9115,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                         // Cluster 1_2_3
@@ -9194,8 +9132,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_4
@@ -9212,8 +9149,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_5
@@ -9230,8 +9166,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_6
@@ -9248,8 +9183,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -9267,8 +9201,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_8
@@ -9285,8 +9218,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_9
@@ -9303,8 +9235,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_10
@@ -9321,8 +9252,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_11
@@ -9339,8 +9269,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                         
                             // Cluster 1_2_12
@@ -9357,8 +9286,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_13
@@ -9375,8 +9303,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             // Cluster 1_2_14
@@ -9393,8 +9320,7 @@ void computeMultipleInlet::getMultipleInlet(
                                        listParticles[p]->m_T_gas, listParticles[p]->m_Yk_gas,
                                        numVarANN, nsp,
                                        input_childLocalStandardized, 
-                                       outputStandardizeANN_Vec,
-                                       listSpecies);
+                                       outputStandardizeANN_Vec, mixture);
                             break;
                             
                             
@@ -9429,7 +9355,7 @@ void computeMultipleInlet::getMultipleInlet(
 	/* ============ STOCHASTIC ============ */
 	/* ==================================== */
       if (step == "Optimisation")
-         Reacting(listParticles, mech, mech_desc, nsp, dt, Pressure);
+         Reacting(listParticles, nsp, dt, Pressure);
        
       else
 	{
@@ -9447,7 +9373,7 @@ void computeMultipleInlet::getMultipleInlet(
 					cout << "***Use Cantera ConstPressureReactor to advance" << " |flagANN  = " << flagANN << endl;
          			}
 			}
-			ReactingParallel(listParticles, mech, mech_desc, nsp, dt, Pressure);
+			ReactingParallel(listParticles, nsp, dt, Pressure);
 		}
 	}	
 	/* ==================================== */
@@ -10087,7 +10013,7 @@ void computeMultipleInlet::getMultipleInlet(
 	{
 		meanSourceTerm_Stochas[k] /= nTot;
 			//if(rank==0) // commented by Huu-Tri@20200731
-				//cout << "meanSource term of " << listSpecies[k]->m_Name << " = " << meanSourceTerm_Stochas [k]  << endl;
+				//cout << "meanSource term of " << mixture->speciesName(k) << " = " << meanSourceTerm_Stochas [k]  << endl;
 	}
 	
 
@@ -10121,8 +10047,8 @@ void computeMultipleInlet::getMultipleInlet(
 					//meanSpeciesProdRate << "T	"; //HT@2020.09.08
 				for (int k=0; k<nsp; k++)
 				{
-				//	meanSpeciesProdRate << k+3 << ":" << listSpecies[k]->m_Name << "	";
-				meanSpeciesProdRate << listSpecies[k]->m_Name << "        "; //Added by Huu-Tri@2020.09.08
+				//	meanSpeciesProdRate << k+3 << ":" << mixture->speciesName(k) << "	";
+				meanSpeciesProdRate << mixture->speciesName(k) << "        "; //Added by Huu-Tri@2020.09.08
 				}	
 				meanSpeciesProdRate << "T	"; 
 				meanSpeciesProdRate << endl;			
@@ -10189,8 +10115,8 @@ void computeMultipleInlet::getMultipleInlet(
 					//dataSourceTerm_Particle << "T	"; //HT@2020.09.08
 				for (int k=0; k<nsp; k++)
 				{
-				//	dataSourceTerm_Particle << k+4 << ":" << listSpecies[k]->m_Name << "	";
-				dataSourceTerm_Particle << listSpecies[k]->m_Name << "	"; // Added by Huu-Tri@2020.09.08
+				//	dataSourceTerm_Particle << k+4 << ":" << mixture->speciesName(k) << "	";
+				dataSourceTerm_Particle << mixture->speciesName(k) << "	"; // Added by Huu-Tri@2020.09.08
 				}
 				dataSourceTerm_Particle << "T";
 				dataSourceTerm_Particle << endl;			
@@ -10317,10 +10243,10 @@ void computeMultipleInlet::getMultipleInlet(
 
 
 
-void computeMultipleInlet::Reacting(vector<Particle*> &listParticles, string mech, string mech_desc, int nsp, double dt, double Pressure)
+void computeMultipleInlet::Reacting(vector<Particle*> &listParticles, int nsp, double dt, double Pressure)
 {
    int nTot = listParticles.size();
-   double *Ym = new double[nsp];
+   vector<double> Ym(nsp,0.0);
    double Hm;
    double Zm;
    double Tm;
@@ -10332,7 +10258,7 @@ void computeMultipleInlet::Reacting(vector<Particle*> &listParticles, string mec
 
       Hm = listParticles[p]->m_H_gas;
 
-      Next_Time_Step(mech, mech_desc, Pressure, Ym, Hm, Tm, dt);
+      Next_Time_Step(Pressure, Ym, Hm, Tm, dt);
 
       for (int k=0; k<nsp; k++)
          listParticles[p]->m_Yk_gas[k] = Ym[k];
@@ -10342,55 +10268,12 @@ void computeMultipleInlet::Reacting(vector<Particle*> &listParticles, string mec
    }
 }
 
-void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, string mech, string mech_desc, int nsp, double dt, double Pressure)
+void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, int nsp, double dt, double Pressure)
 {
    int nTot = listParticles.size();
-   double *Ym = new double[nsp];
+   vector<double> Ym(nsp,0.0);
    double Hm;
    double Tm;
-
-   //Treat parallel stuff
-   int rank, nb_processus;
-  
-   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-   MPI_Comm_size(MPI_COMM_WORLD, &nb_processus);
-
-   int Ifi = 0;
-   int Ila = 0;
-   int Ifi_rank = 0;
-   int Ila_rank = 0;
-
-   int RecvCounts [nb_processus];
-   int Disp [nb_processus];
-   for (int r=0; r<nb_processus; r++)
-      Disp[r] = 0;
-   
-
-   for (int r=0; r<nb_processus; r++)
-   {
-      if (r < nTot%nb_processus)
-      {
-         Ifi = (nTot/nb_processus)*r + r;
-         Ila = (nTot/nb_processus)*r + (nTot/nb_processus) + r + 1;
-      }
-      else
-      {
-         Ifi = (nTot/nb_processus)*r + nTot%nb_processus;
-         Ila = (nTot/nb_processus)*r + (nTot/nb_processus) + nTot%nb_processus;
-      }
-
-      RecvCounts[r] = (Ila-Ifi)*(nsp+2); //for Yks and H and T
-      for (int rb=r; rb<nb_processus-1; rb++)
-         Disp[rb+1] += (Ila-Ifi)*(nsp+2);
-      
-      if (rank == r)
-      {
-         Ifi_rank = Ifi;
-         Ila_rank = Ila;
-      }
-   }
-
-   int nb_particles = Ila_rank-Ifi_rank;
 
    for (int p=Ifi_rank; p<Ila_rank; p++)
    {
@@ -10399,7 +10282,7 @@ void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, st
 
       Hm = listParticles[p]->m_H_gas;
 
-      Next_Time_Step(mech, mech_desc, Pressure, Ym, Hm, Tm, dt);
+      Next_Time_Step(Pressure, Ym, Hm, Tm, dt);
 
       for (int k=0; k<nsp; k++)
          listParticles[p]->m_Yk_gas[k] = Ym[k];
@@ -10408,8 +10291,8 @@ void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, st
       listParticles[p]->m_T_gas = Tm;
    }
 
-   double Data_Proc[nb_particles*(nsp+2)];
-   double Data_All[nb_processus*nb_particles*(nsp+2)];
+   double Data_Proc[nb_var_loc];
+   double Data_All[nTot*(nsp+1)];
 
    int count = 0;
    for (int p=Ifi_rank; p<Ila_rank; p++)
@@ -10426,10 +10309,10 @@ void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, st
       count += 1;
    }
 
-   MPI_Allgatherv(Data_Proc, nb_particles*(nsp+2), MPI_DOUBLE, Data_All, RecvCounts, Disp, MPI_DOUBLE, MPI_COMM_WORLD);
+   MPI_Allgatherv(Data_Proc, nb_var_loc, MPI_DOUBLE, Data_All, RecvCounts, Disp, MPI_DOUBLE, MPI_COMM_WORLD);
 
    count = 0;
-   for (int p=0; p<nTot; p++)
+   for (int p=0; p<Ifi_rank; p++)
    {
  
       for (int k=0; k<nsp; k++)
@@ -10443,54 +10326,61 @@ void computeMultipleInlet::ReactingParallel(vector<Particle*> &listParticles, st
       listParticles[p]->m_T_gas = Data_All[count];
       count += 1;
    }
+    //
+	count += nb_var_loc;
+	//
+	for (int p=Ila_rank; p<nTot; p++)
+	{
+		for (int k=0; k<nsp; k++)
+		{
+			listParticles[p]->m_Yk_gas[k] = Data_All[count];
+			count += 1;
+		}
+      listParticles[p]->m_H_gas = Data_All[count];
+      count += 1;
+
+		listParticles[p]->m_T_gas = Data_All[count];
+		count += 1;
+	}
 }
 
-void computeMultipleInlet::getMixedGasesComposition(string mech, string mech_desc, vector<MultipleInlet*> listInlets, string step)
+void computeMultipleInlet::getMixedGasesComposition(vector<MultipleInlet*> listInlets, string step)
 {
-
-   int rank, nb_processus;
-
+	int rank, nproc;
    if (step != "Optimisation")
    {
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-      MPI_Comm_size(MPI_COMM_WORLD, &nb_processus);
+		MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+	} else {
+		rank = -1;
    }
 
-   IdealGasMix *mixture  = new IdealGasMix(mech,mech_desc);
    int nsp = mixture->nSpecies();
    int nbInlets = listInlets.size(); 
 
-   double *Compo_Yk_mixed = new double[nsp];
-   for (int k=0; k<nsp; k++)
-      Compo_Yk_mixed[k] = 0.0;
+	vector<double> Compo_Yk_mixed(nsp,0.0);
    double Compo_H_mixed = 0.0;
    double Total_flowRate = 0.0;
 
    //Composition of the burned gases
    for (int n=0; n<nbInlets; n++)
    {
-      IdealGasMix *InletMixture = new IdealGasMix(mech, mech_desc);
-
       if (listInlets[n]->m_X_Species != "")
       {
          if (rank == 0)
           //  cout << "Set the mole fraction of inlet " << n << endl;
-         InletMixture->setState_TPX(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_X_Species);
-      }
-      else if (listInlets[n]->m_Y_Species != "")
-      {
-         if (rank == 0)
+			mixture->setState_TPX(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_X_Species);
+		} else if (listInlets[n]->m_Y_Species != "") {
           //  cout << "Set the mass fraction of inlet " << n << endl;
-         InletMixture->setState_TPY(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_Y_Species);
+			mixture->setState_TPY(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_Y_Species);
       }
 
-      double *Ym = new double[nsp];
+		vector<double> Ym(nsp,0.0);
       double Hm = 0.0;
-      InletMixture->getMassFractions(Ym);
-      Hm = InletMixture->enthalpy_mass();
+		mixture->getMassFractions(&Ym[0]);
+		Hm = mixture->enthalpy_mass();
 
-      for (int k=0; k<nsp; k++)
-         Compo_Yk_mixed[k] += listInlets[n]->m_flowRate*Ym[k];
+		for (int k=0; k<nsp; k++) Compo_Yk_mixed[k] += listInlets[n]->m_flowRate*Ym[k];
       Compo_H_mixed += listInlets[n]->m_flowRate*Hm;
       Total_flowRate += listInlets[n]->m_flowRate;
    }
@@ -10506,14 +10396,13 @@ void computeMultipleInlet::getMixedGasesComposition(string mech, string mech_des
       cout << "Compo_H_mixed " << Compo_H_mixed << endl;
    }
 
-   IdealGasMix *TestMixture = new IdealGasMix(mech, mech_desc);
-   TestMixture->setMassFractions(Compo_Yk_mixed);
-   TestMixture->setState_HP(Compo_H_mixed, listInlets[0]->m_Pressure);
+	mixture->setMassFractions(&Compo_Yk_mixed[0]);
+	mixture->setState_HP(Compo_H_mixed, listInlets[0]->m_Pressure);
 
-   double *Xm = new double[nsp];
+	vector<double> Xm(nsp);
    double T_mixed = 0.0;
-   TestMixture->getMoleFractions(Xm);
-   T_mixed = TestMixture->temperature();
+	mixture->getMoleFractions(&Xm[0]);
+	T_mixed = mixture->temperature();
 
    if (rank == 0)
    {
@@ -10524,17 +10413,13 @@ void computeMultipleInlet::getMixedGasesComposition(string mech, string mech_des
       }
       cout << "T_mixed " << T_mixed << endl;
    }
-
-   delete TestMixture;
 }
 
-void computeMultipleInlet::Next_Time_Step_with_drgep(string mech, string mech_desc, vector<bool> Targets, double P, double *Ym, double &Hm, double &Tm, double delta_t, 
-                    vector<vector<double> > &R_AD_Trajectories, vector<vector<double> > &max_j_on_Target, string  step, int n, double time)
+void computeMultipleInlet::Next_Time_Step_with_drgep(vector<bool> Targets, double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t, 
+   vector<vector<double> > &R_AD_Trajectories, vector<vector<double> > &max_j_on_Target, string step)
 {
-
-
-   IdealGasMix *mixture = new IdealGasMix(mech, mech_desc);
-   mixture->setMassFractions(Ym);
+	try {
+		mixture->setMassFractions(&Ym[0]);
    mixture->setState_HP(Hm, P);
 
    ConstPressureReactor reac;
@@ -10543,13 +10428,16 @@ void computeMultipleInlet::Next_Time_Step_with_drgep(string mech, string mech_de
    sim.addReactor(reac);
 
    sim.advance(delta_t);
+	} catch (...) {
+		return;
+	}
 
    Hm  = mixture->enthalpy_mass();
    Tm = mixture->temperature();
-   mixture->getMassFractions(Ym);
+	mixture->getMassFractions(&Ym[0]);
 
    drgep *species_relations = new drgep();
-   species_relations->drgep_0D_species(mixture, Targets, R_AD_Trajectories, n, time);
+	species_relations->drgep_0D_species(mixture, Targets, R_AD_Trajectories, 0, 0.0);
 
   // Comment the duplicated part (???) - Huu-TriNGUYEN@2020.10.14  	
    /*if (step == "DRGEP_Reactions")
@@ -10584,16 +10472,13 @@ void computeMultipleInlet::Next_Time_Step_with_drgep(string mech, string mech_de
          }
       }
    }
-
-   delete mixture;
 }
 
 //Next_Time_Step without drgep analysis (to use for the computations with optimisation)
-void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double P, double *Ym, double &Hm, double &Tm, double delta_t)
+void computeMultipleInlet::Next_Time_Step(double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t)
 {
-   IdealGasMix *mixture = new IdealGasMix(mech, mech_desc);
-
-   mixture->setMassFractions(Ym);
+	try {
+		mixture->setMassFractions(&Ym[0]);
    mixture->setState_HP(Hm, P);
 
    ConstPressureReactor reac;
@@ -10606,6 +10491,9 @@ void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double 
 //   cout << "71 " << sim.componentName(71) << endl;
 
    sim.advance(delta_t);
+	} catch (...) {
+		return;
+	}
 
    // Function to get the internal step number during advance() - Huu-Tri@2020.09.15
    //int numStep = 0;
@@ -10614,18 +10502,14 @@ void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double 
 
    Hm  = mixture->enthalpy_mass();
    Tm = mixture->temperature();
-   mixture->getMassFractions(Ym);
-
-
-   delete mixture;
+	mixture->getMassFractions(&Ym[0]);
 }
 
 //Next_Time_Step with QSS analysis 
-void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double P, double *Ym, double &Hm, double &Tm, double delta_t,
+void computeMultipleInlet::Next_Time_Step(double P, vector<double> &Ym, double &Hm, double &Tm, double delta_t,
                     vector<vector<vector<double> > > &Production_Trajectories_ref, vector<vector<vector<double> > > &Consumption_Trajectories_ref, int nInlet, int nLine)
 {
-   IdealGasMix *mixture = new IdealGasMix(mech, mech_desc);
-   mixture->setMassFractions(Ym);
+	mixture->setMassFractions(&Ym[0]);
    mixture->setState_HP(Hm, P);
 
    ConstPressureReactor reac;
@@ -10637,7 +10521,7 @@ void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double 
 
    Hm  = mixture->enthalpy_mass();
    Tm = mixture->temperature();
-   mixture->getMassFractions(Ym);
+	mixture->getMassFractions(&Ym[0]);
 
    int nreac = mixture->nReactions();
    int nsp = mixture->nSpecies();
@@ -10661,7 +10545,6 @@ void computeMultipleInlet::Next_Time_Step(string mech, string mech_desc, double 
       Production_Trajectories_ref[nInlet][nLine][k] = omega_k_prod;
       Consumption_Trajectories_ref[nInlet][nLine][k] = omega_k_cons;
    }
-   delete mixture;
 }
 
 
