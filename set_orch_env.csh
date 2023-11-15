@@ -31,7 +31,7 @@ sed -i "/^python_prefix =/c\python_prefix = '"${ORCH_BASE}"dummy_python'" ${GTCO
 sed -i "/^python3_prefix =/c\python3_prefix = '"${ORCH_BASE}"dummy_python'" ${GTCOMB_CT_HOME}/cantera.conf
 sed -i "/^sundials_include =/c\sundials_include = '"${SUNDIALS_INC}"'" ${GTCOMB_CT_HOME}/cantera.conf
 sed -i "/^sundials_libdir =/c\sundials_libdir = '"${SUNDIALS_LIB}"'" ${GTCOMB_CT_HOME}/cantera.conf
-sed -i "/^boost_inc_dir =/c\boost_inc_dir = '"${BOOST_INC}"'" ${GTCOMB_CT_HOME}/cantera.conf
+sed -i "/^boost_inc_dir =/c\boost_inc_dir = '"${BOOSTPATH}"'" ${GTCOMB_CT_HOME}/cantera.conf
 sed -i "/^extra_inc_dirs =/c\extra_inc_dirs = '"${EIGEN_INC}"'" ${GTCOMB_CT_HOME}/cantera.conf
 #
 setenv CT_INC ${ORCH_BASE}/Cantera_lib/include
