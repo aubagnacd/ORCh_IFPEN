@@ -10,14 +10,11 @@
 #include <fstream>
 #include "mpi.h"
 
-
-
 //ORCh
 #include "flamemodel.h"
 #include "../drgep/drgep.h"
 #include "particle.h"
 #include "../read_write/read.h"
-
 
 //Cantera properties
 #include <Cantera.h>
@@ -26,13 +23,6 @@
 using namespace Cantera;
 using namespace Cantera_CXX;
 using namespace User;
-
-// Huu-Tri@20200724 : Add Tensorflow libraries "cppflow" - Use Tensorflow C-API to load ANN model and predict in C++
-// /home/fkissel/workdir/orch/ORCh/cppflow
-// CppFlow : https://github.com/serizba/cppflow
-#include "../cppflow/include/Model.h"
-#include "../cppflow/include/Tensor.h"
-
 
 #define PI 3.14159265359
 

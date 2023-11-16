@@ -6,13 +6,9 @@
 # "lib" or "include" end dummy path if required at end of path
 setenv MPI_LIB /path/to/mpi/lib
 setenv BOOSTPATH /path/to/boost/include
-setenv HDF5_INC /path/to/hdf5/include
-setenv HDF5_LIB /path/to/hdf5/lib
 setenv SUNDIALS_INC /path/to/sundials/include
 setenv SUNDIALS_LIB /path/to/sundials/lib
 setenv EIGEN_INC /path/to/eigen
-setenv TENSORFLOW_CAPI_PATH /path/to/tensorflow
-setenv OPENCV_PATH /path/to/opencv
 #
 # Do not touch
 #

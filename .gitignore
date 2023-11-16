@@ -1,9 +1,12 @@
+.vscode
+
 Cantera_lib
 dummy_python
 
 ORCh/cppflow
 ORCh/*/*.o
 ORCh/emst/*.mod
+ORCh/exe/mainProgram
 
 Cantera/build
 Cantera/.sconf_temp

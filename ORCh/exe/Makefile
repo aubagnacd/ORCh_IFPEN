@@ -1,12 +1,10 @@
-ORCh=../.
-
 all: conditions mainProgram
 
 conditions : 
-	gcc -c conditions.cpp
+	mpic++ -c conditions.cpp
 
-mainProgram: ../main/mainProgram.cpp
-	mpic++ -pthread -L$(SUNDIALS_LIB) -I$(SUNDIALS_INC) -L$(MPI_LIB) -I$(BOOSTPATH) -I$(ORCH_BASE)/Cantera/include -L$(CT_LIB) -L$(GTCOMB_CT_HOSTTYPE) -L$(TENSORFLOW_CAPI_PATH)/lib -I$(TENSORFLOW_CAPI_PATH)/include -L$(OPENCV_PATH)/lib64 -I$(OPENCV_PATH)/include -o mainProgram $(ORCh)/main/mainProgram.cpp  conditions.o  $(ORCh)/tools/tools.o $(ORCh)/tools/gnuplot.o $(ORCh)/tools/fitness_criteria.o $(ORCh)/lumping/lumping.o $(ORCh)/lumping/lumping_species.o $(ORCh)/cantera/computeMultipleInlet.o $(ORCh)/cantera/computePremixedFlames.o $(ORCh)/cantera/computeAutoIgnition.o $(ORCh)/cantera/Analytic_function.o $(ORCh)/cantera/particle.o $(ORCh)/cantera/flamemodel.o $(ORCh)/drgep/drgep.o $(ORCh)/read_write/species.o $(ORCh)/read_write/reaction.o $(ORCh)/read_write/read.o $(ORCh)/read_write/write.o $(ORCh)/read_write/write_QSS.o $(ORCh)/read_write/write_QSS_FORTRAN.o $(ORCh)/read_write/QSSscenario.o $(ORCh)/optimisation/OptimScenario.o $(ORCh)/optimisation/optimisation.o $(ORCh)/optimisation/CreateAnalyticDirectory.o $(ORCh)/main/mainDRGEPSpecies.o $(ORCh)/main/mainDRGEPReactions.o $(ORCh)/main/mainComputeTrajectories.o $(ORCh)/main/mainLumping.o $(ORCh)/tools/outputs.o $(ORCh)/emst/emst_subs.o $(ORCh)/emst/emst.o $(ORCH)/cppflow/src/Model.o $(ORCH)/cppflow/src/Tensor.o -O3 -lm -lhdf5 -lhdf5_hl -lcantera -luser -lifcore -ltensorflow -ltensorflow_framework -lopencv_core
+mainProgram:
+	mpic++ -pthread -L$(SUNDIALS_LIB) -I$(SUNDIALS_INC) -L$(MPI_LIB) -I$(BOOSTPATH) -I$(ORCH_BASE)/Cantera/include -L$(CT_LIB) -L$(GTCOMB_CT_HOSTTYPE) -o mainProgram ../main/mainProgram.cpp conditions.o  ../tools/tools.o ../tools/gnuplot.o ../tools/fitness_criteria.o ../lumping/lumping.o ../lumping/lumping_species.o ../cantera/computeMultipleInlet.o ../cantera/computePremixedFlames.o ../cantera/computeAutoIgnition.o ../cantera/Analytic_function.o ../cantera/particle.o ../cantera/flamemodel.o ../drgep/drgep.o ../read_write/species.o ../read_write/reaction.o ../read_write/read.o ../read_write/write.o ../read_write/write_QSS.o ../read_write/write_QSS_FORTRAN.o ../read_write/QSSscenario.o ../optimisation/OptimScenario.o ../optimisation/optimisation.o ../optimisation/CreateAnalyticDirectory.o ../main/mainDRGEPSpecies.o ../main/mainDRGEPReactions.o ../main/mainComputeTrajectories.o ../main/mainLumping.o ../tools/outputs.o ../emst/emst_subs.o ../emst/emst.o -O3 -lm -lcantera -luser -lsundials_cvodes -lsundials_nvecserial -lgfortran
 
 clean:
 	rm -f mainProgram *.o

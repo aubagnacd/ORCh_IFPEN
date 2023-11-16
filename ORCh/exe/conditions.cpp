@@ -153,6 +153,7 @@ void conditions(int &debuglevel,
 	string &configuration, //Studied combustion regime - OPTIONS: "MultipleInlet"; "PremixedFlames";
 	vector<MultipleInlet*> &listInlets, //List of flames with their characteristics for the multiple inlet problem
 	vector<PremixedFlames*> &listFlames, //List of premixed flames with their characteristics
+	vector<AutoIgnition*> &listIgnitions,
 	vector<string> &listTargets, //List of target species
 	string &step, //Step to perform - OPTIONS: "DRGEP_Species"; "DRGEP_Reactions"; "ComputeTrajectories"; "computeQSSCriteria"; "getQSSfile"; "getQSSfileFORTRAN"; "Optimisation"; "Lumping";
 	bool &new_mixing, //Define if a new mixing of the particles is defined or if the mixing used with the previous step is kept

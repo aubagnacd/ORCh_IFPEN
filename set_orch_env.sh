@@ -6,13 +6,9 @@
 # "lib" or "include" end dummy path if required at end of path
 export MPI_LIB="/path/to/mpi/lib"
 export BOOSTPATH="/path/to/boost/include"
-export HDF5_INC="/path/to/hdf5/include"
-export HDF5_LIB="/path/to/hdf5/lib"
 export SUNDIALS_INC="/path/to/sundials/include"
 export SUNDIALS_LIB="/path/to/sundials/lib"
 export EIGEN_INC="/path/to/eigen"
-export TENSORFLOW_CAPI_PATH="/path/to/tensorflow"
-export OPENCV_PATH="/path/to/opencv"
 #
 # Do not touch
 #
