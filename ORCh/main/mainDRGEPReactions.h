@@ -36,20 +36,12 @@ using namespace Cantera;
 using namespace Cantera_CXX;
 using namespace User;
 
-   void drgepReactions(int debuglevel,
-                       vector<string> speciesToPlot,
+   void drgepReactions(ORChInputs inputs,
                        vector<string> listTargets,
-                       string configuration, 
-                       string initial_mech, 
-                       string mech_desc,
                        vector<MultipleInlet*> listInlets, 
                        vector<PremixedFlames*> listFlames,
-                       vector<bool> Targets, 
-                       bool new_mixing,
-                       bool plot_T, 
-                       bool plot_U, 
+                       vector<bool> Targets,
                        vector<string> trajectory_ref,
-                       string mech_ref,
                        int rank);
 
 #endif

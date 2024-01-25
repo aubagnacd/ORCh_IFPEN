@@ -15,23 +15,13 @@ using namespace Cantera;
 using namespace Cantera_CXX;
 using namespace User;
 
+void output_datas (string outputName,
+                     vector<vector<double> > Y, vector<double> T ,
+                     vector<double> U, 
+                     vector<double> position, 
+                     double position_max_wdot, 
+                     IdealGasMix* mixture);
 
-   void OutputDeterministicTrajectories (int nInlets, 
-            int nbIterations, 
-            vector<Species_ORCh*> listSpecies, 
-            string outputName, 
-            vector<vector<vector<double> > > Ym_Trajectories, 
-            vector<vector<double> > T_Trajectories, 
-            vector<double> time_store);
-
-
-   void output_datas (string outputName,
-                      vector<vector<double> > Y, vector<double> T ,
-                      vector<double> U, 
-                      vector<double> position, 
-                      double position_max_wdot, 
-                      IdealGasMix* mixture);
-
-   void plotFitness(string path);
+void plotFitness(string path);
 
 #endif

@@ -36,24 +36,12 @@ using namespace Cantera;
 using namespace Cantera_CXX;
 using namespace User;
 
-
-
-
-   void ComputeTrajectories(
-               int debuglevel,
-               vector <string> speciesToPlot,
-               vector <string> listTargets,
-               string configuration,
-               string mech,
-               string mech_desc,
-               vector<MultipleInlet*> listInlets,
-               vector<PremixedFlames*> listFlames,
-               vector<bool> Targets,
-               bool new_mixing,
-               bool plot_T,
-               bool plot_U,
-               vector<string> trajectory_ref,
-               string mech_ref,
-               int rank);
+void ComputeTrajectories(ORChInputs inputs,
+            vector <string> listTargets,
+            vector<MultipleInlet*> listInlets,
+            vector<PremixedFlames*> listFlames,
+            vector<bool> Targets,
+            vector<string> trajectory_ref,
+            int rank);
 
 #endif

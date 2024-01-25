@@ -3,7 +3,6 @@
 
 //General properties
 #include <iostream>
-using namespace std;
 
 //Cantera properties
 #include <Cantera.h>
@@ -17,9 +16,9 @@ class drgep
 {
    public:
    //constructeur
-   drgep();
+   drgep(IdealGasMix *mixture);
 
-   virtual void drgep_0D_species(IdealGasMix *mixture, vector<bool> Targets, vector<vector<double> > &R_AD_Trajectories, int n, double time) const;
+   virtual void drgep_0D_species(IdealGasMix *mixture, vector<bool> Targets, vector<vector<double> > &R_AD_Trajectories, int n, double time, bool print) const;
 
    virtual void drgep_0D_reactions(IdealGasMix *mixture, vector<vector<double> > &rj_for_k) const;
 
@@ -35,6 +34,8 @@ class drgep
    virtual ~drgep();
 
    private:
+   int nreac, nsp;
+   vector<vector<double>> prodStoichCoeff,reactStoichCoeff;
 
 };
 

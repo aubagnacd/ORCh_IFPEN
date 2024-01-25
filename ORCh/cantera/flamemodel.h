@@ -30,7 +30,6 @@ class AutoIgnition
 
 };
 
-
 //--------------------
 class Premixed
 {
@@ -44,7 +43,6 @@ class Premixed
    public:
 
 };
-
 
 //--------------------
 class MultipleInlet
@@ -70,24 +68,19 @@ class MultipleInlet
 
 };
 
-
 //--------------------
 class Characteristics_MultipleInlet : public MultipleInlet
 {
    public:
    //constructeur
    Characteristics_MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat, 
-                                 double tau_t, double delta_t, int NbIterations, bool BurnedGases, bool EMST);
+                                 bool BurnedGases);
 
    //destructeur
    virtual ~Characteristics_MultipleInlet();
 
    public:
-   double m_tau_t;
-   double m_delta_t;
-   int m_NbIterations;
    bool m_BurnedGases;
-   bool m_EMST;
 };
 
 //--------------------

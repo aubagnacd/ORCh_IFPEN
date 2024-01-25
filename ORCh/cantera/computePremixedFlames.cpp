@@ -392,7 +392,7 @@ void computePremixedFlames(string mech, string outputName, string mech_desc, vec
    {
       if (step == "DRGEP_Species" || step == "DRGEP_Reactions")
       {
-         drgep *species_relations = new drgep();
+         drgep *species_relations = new drgep(mixture);
 
          //----------Limits should be given to compute DRGEP in the inner region of the flame (not burned gases region)----------//
          //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!//

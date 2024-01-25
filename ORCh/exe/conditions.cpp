@@ -145,20 +145,11 @@ void read_vector_inletGB(string key, vector<MultipleInlet*> *listInlets, Charact
 	}
 }
 
-void conditions(int &debuglevel,
-	vector <string> &speciesToPlot, //Trajectories the user wants to plot
-	string &mech_ref, //Reference detailed mechanism
-	string &mech, //Current step reference chemical scheme
-	string &mech_desc, //Description of the reference chemical scheme
-	string &configuration, //Studied combustion regime - OPTIONS: "MultipleInlet"; "PremixedFlames";
+void conditions(ORChInputs &inputs,
 	vector<MultipleInlet*> &listInlets, //List of flames with their characteristics for the multiple inlet problem
 	vector<PremixedFlames*> &listFlames, //List of premixed flames with their characteristics
 	vector<AutoIgnition*> &listIgnitions,
 	vector<string> &listTargets, //List of target species
-	string &step, //Step to perform - OPTIONS: "DRGEP_Species"; "DRGEP_Reactions"; "ComputeTrajectories"; "computeQSSCriteria"; "getQSSfile"; "getQSSfileFORTRAN"; "Optimisation"; "Lumping";
-	bool &new_mixing, //Define if a new mixing of the particles is defined or if the mixing used with the previous step is kept
-	bool &plot_T,
-	bool &plot_U,
 	vector<QSSscenario*> &listQSSscenarios, //List of scenarios to test with different QSS species 
 	OptimScenario* &listOptimScenarios, //List of scenarios to optimise
 	vector<string> &trajectory_ref) //Name of a reference trajectory defined by the user for the plots 
@@ -188,11 +179,7 @@ void conditions(int &debuglevel,
 	double liquidDensity = 0.0;
 	double EvaporationLatentHeat = 0.0;
 	MultipleInlet* MI; 
-	Characteristics_MultipleInlet* MGB; 
-	double MixingTime = 0.0;
-	double TimeStep = 0.0;
-	int IterationNumber = 0;
-	int EMST = 0;
+	Characteristics_MultipleInlet* MGB;
 	
 	int nbFlame=0;
 	int nbInlet=0;
@@ -207,32 +194,35 @@ void conditions(int &debuglevel,
 	double AllowedVariation_A = 0.0;
 	double AllowedVariation_b = 0.0;
 	double AllowedVariation_E = 0.0;
+
+	inputs.rMassFlowRate = 1000.0; // DAK : moved from computeMultipleInlet, still hardcoded for now to prevent inputs bloat (is it really needed?)
 	
 	for (std::string line; getline(input,line);)
 	{
-		read_bool("NewMixing", &new_mixing, line);
-		read_double("MixingTime", &MixingTime, line);
-		read_double("TimeStep", &TimeStep, line);
-		read_integer("IterationNumber", &IterationNumber, line);
-		read_integer("EMST", &EMST, line);
+		read_bool("NewMixing", &(inputs.new_mixing), line);
+		read_double("MixingTime", &(inputs.MixingTime), line);
+		read_double("TimeStep", &(inputs.TimeStep), line);
+		read_integer("IterationNumber", &(inputs.IterationNumber), line);
 		
-		read_integer("debuglevel",&debuglevel, line);
+		read_integer("debuglevel",&(inputs.debuglevel), line);
 		
-		read_string("configuration", &configuration, line);
-		read_string("step", &step, line);
+		read_string("configuration", &(inputs.configuration), line);
+		read_string("step", &(inputs.step), line);
 		
-		read_string("mech", &mech, line);
+		read_bool("WriteTraj", &(inputs.writeTraj), line);
+		read_bool("WriteParts", &(inputs.writeAllPart), line);
 		
-		read_string("mech_desc", &mech_desc, line);
+		read_bool("drgepTraj", &(inputs.drgepTraj), line);
+		read_bool("Print_rAB", &(inputs.print_all_rAB), line);
+
+		read_string("mech", &(inputs.mech), line);
+		read_string("mech_desc", &(inputs.mech_desc), line);
 		
-		read_vector("speciesToPlot", &speciesToPlot, line);
+		read_bool("EMST", &(inputs.activateCurl), line);
 		
-		read_bool("plot_T",&plot_T, line);
-		read_bool("plot_U",&plot_U, line);
+		read_string("mech_ref", &(inputs.mech_ref), line);
 		
-		read_string("mech_ref", &mech_ref, line);
-		
-		if ((mech_ref != "None")&&(configuration != "PremixedFlames"))
+		if ((inputs.mech_ref != "None")&&(inputs.configuration != "PremixedFlames"))
 		{
 			read_vector("trajectory_ref", &trajectory_ref, line);
 		}
@@ -241,7 +231,7 @@ void conditions(int &debuglevel,
 			trajectory_ref.push_back("");
 		}
 		
-		if (configuration == "MultipleInlet") {
+		if (inputs.configuration == "MultipleInlet") {
 			read_double("T", &T, line);
 			read_double("MassFlowRate", &MassFlowRate, line);
 			read_double("Pressure", &P, line);
@@ -287,8 +277,7 @@ void conditions(int &debuglevel,
 		{
 			nbInlet++;
 			bool isEvap = (EvaporationModel > 0)?true:false;
-			bool isEMST = (EMST > 0)?true:false;
-			MGB = new Characteristics_MultipleInlet(T, P, MassFlowRate, Xk, Yk, isEvap, DropletDiameter, EvaporationTime, liquidDensity, EvaporationLatentHeat, MixingTime, TimeStep, IterationNumber, true, isEMST);
+			MGB = new Characteristics_MultipleInlet(T, P, MassFlowRate, Xk, Yk, isEvap, DropletDiameter, EvaporationTime, liquidDensity, EvaporationLatentHeat, true);
 			read_vector_inletGB("//EndInletGB", &listInlets, MGB, line);
 		}
 		read_vector("listTargets", &listTargets, line);
@@ -307,6 +296,8 @@ void conditions(int &debuglevel,
 		read_double("AllowedVariation_E", &AllowedVariation_E, line);
 	}
 	input.close();
+
+	inputs.activateCurl = !inputs.activateCurl;
 	
 	//------QSS step------//
 	vector<string> vec(array1);
