@@ -3,6 +3,13 @@
 Cantera_lib
 dummy_python
 
+Tests/*/*.png
+Tests/*/*.py
+Tests/*/mainProgram
+Tests/*/*.log
+Tests/*/*.dat
+Tests/*/outputs/*
+
 ORCh/cppflow
 ORCh/*/*.o
 ORCh/emst/*.mod
