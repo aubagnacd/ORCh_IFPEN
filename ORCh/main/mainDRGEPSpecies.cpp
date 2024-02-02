@@ -47,8 +47,8 @@ void drgepSpecies(ORChInputs inputs, vector<MultipleInlet*> listInlets, vector<P
    vector<vector<double> > max_jr_on_Target (nsp_init, vector<double> (nreac_init,0.0));
    vector<vector<vector<double> > > Production_Trajectories_ref (nbInlets, vector<vector<double> > (nbIterations, vector<double> (nsp_init, 0.0)));
    vector<vector<vector<double> > > Consumption_Trajectories_ref (nbInlets, vector<vector<double> > (nbIterations, vector<double> (nsp_init, 0.0)));
-   vector<vector<double> > T_Trajectories_ref (nbInlets, vector<double> (nbIterations, 0.0));
-   vector<vector<vector<double> > > Ym_Trajectories_ref (nbInlets, vector<vector<double> > (nbIterations, vector<double> (nsp_init, 0.0)));
+   vector<vector<double> > T_Trajectories_ref (nbInlets, vector<double> (nbIterations+1, 0.0));
+   vector<vector<vector<double> > > Ym_Trajectories_ref (nbInlets, vector<vector<double> > (nbIterations+1, vector<double> (nsp_init, 0.0)));
    vector<bool> SpeciesIntoReactants (nsp_init, false);
    vector<vector<double> > QSS_Criteria (nsp_init, vector<double> (2, 0.0));
 
@@ -194,8 +194,8 @@ void drgepSpecies(ORChInputs inputs, vector<MultipleInlet*> listInlets, vector<P
 
       if (inputs.configuration == "MultipleInlet")
       {
-         vector<vector<vector<double> > > Ym_Trajectories (nbInlets, vector<vector<double> > (nbIterations, vector<double> (nbSpeciesToKeep, 0.0)));
-         vector<vector<double> > T_Trajectories (nbInlets, vector<double> (nbIterations, 0.0));
+         vector<vector<vector<double> > > Ym_Trajectories (nbInlets, vector<vector<double> > (nbIterations+1, vector<double> (nbSpeciesToKeep, 0.0)));
+         vector<vector<double> > T_Trajectories (nbInlets, vector<double> (nbIterations+1, 0.0));
 
          computeMultipleInlet *c = new computeMultipleInlet();
          c->getMultipleInlet(inputs,
