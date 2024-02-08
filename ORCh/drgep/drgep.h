@@ -36,6 +36,7 @@ class drgep
    private:
    int nreac, nsp;
    vector<vector<double>> prodStoichCoeff,reactStoichCoeff;
+   vector<vector<int>> reac_list;
 
 };
 

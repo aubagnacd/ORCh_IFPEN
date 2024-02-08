@@ -11,6 +11,7 @@ drgep::drgep(IdealGasMix *mixture) //Constructeur
 
    prodStoichCoeff.resize(nsp);
    reactStoichCoeff.resize(nsp);
+   reac_list.resize(nsp);
 
    for (int k = 0; k < nsp; k++) {
       prodStoichCoeff[k].resize(nreac,0.0);
@@ -19,6 +20,8 @@ drgep::drgep(IdealGasMix *mixture) //Constructeur
       for (int r = 0; r < nreac; r++) {
          prodStoichCoeff[k][r] = mixture->productStoichCoeff(k,r);
          reactStoichCoeff[k][r] = mixture->reactantStoichCoeff(k,r);
+         //
+         if ((prodStoichCoeff[k][r] != 0.0) || (reactStoichCoeff[k][r]!=0.0)) reac_list[k].push_back(r);
       }
    }
 }
@@ -176,8 +179,10 @@ void drgep::drgep_species(IdealGasMix *mixture, vector<bool> Targets, vector<vec
    {
       double omega_k_prod = 0.0;
       double omega_k_cons = 0.0;
-      for (int j=0; j<nreac; j++)
+      int j;
+      for (int rind=0; rind<reac_list[k].size(); rind++)
       {
+         j = reac_list[k][rind];
          omega_k_prod += prodStoichCoeff[k][j]*fwdRates[j]
                         +reactStoichCoeff[k][j]*revRates[j];
          omega_k_cons += reactStoichCoeff[k][j]*fwdRates[j]
@@ -206,28 +211,38 @@ void drgep::drgep_species(IdealGasMix *mixture, vector<bool> Targets, vector<vec
 
    double r_AB_sup,r_AB_inf;
    vector<vector<double> > r_AB (nsp, vector<double>(nsp));
+   vector<vector<double> > r_AD_intermediate (nsp, vector<double>(nsp,0.0));
 
    //r_AB quantifies the direct inter-relation between species 
    for (int ka=0; ka<nsp; ka++)
    {
-      for (int kb=0; kb<nsp; kb++)
+      int j;
+      r_AB_inf = 0.0;
+      for (int rind=0; rind<reac_list[ka].size(); rind++)
       {
-         r_AB_sup = 0.0;
-         r_AB_inf = 0.0;
-         for (int j=0; j<nreac; j++)
+         j = reac_list[ka][rind];
+         r_AB_inf += abs((reactStoichCoeff[ka][j]+prodStoichCoeff[ka][j])*(fwdRates[j]-revRates[j]));
+      }
+
+      if (r_AB_inf == 0.0)
+      {
+         for (int kb=0; kb>nsp;kb++) {
+            r_AB[ka][kb] = 0.0;
+            r_AD_intermediate[ka][kb] = r_AB[ka][kb];
+         }
+      } else {
+         for (int kb=0; kb<nsp; kb++)
          {
-            if (reactStoichCoeff[kb][j] != 0.0 || prodStoichCoeff[kb][j] != 0.0)
+            r_AB_sup = 0.0;
+
+            for (int rind=0; rind<reac_list[kb].size(); rind++)
             {
+               j = reac_list[kb][rind];
                r_AB_sup += abs((reactStoichCoeff[ka][j]+prodStoichCoeff[ka][j])*(fwdRates[j]-revRates[j]));
             }
-            r_AB_inf += abs((reactStoichCoeff[ka][j]+prodStoichCoeff[ka][j])*(fwdRates[j]-revRates[j]));
-         }
 
-         if (r_AB_inf == 0.0)
-         {
-            r_AB[ka][kb] = 0.0;
-         } else {
             r_AB[ka][kb] = r_AB_sup/r_AB_inf;
+            r_AD_intermediate[ka][kb] = r_AB[ka][kb];
          }
       }
    }
@@ -253,22 +268,17 @@ void drgep::drgep_species(IdealGasMix *mixture, vector<bool> Targets, vector<vec
    }
 //--------------------------------------------------------------//
 
-   vector<vector<double> > r_AD_intermediate (nsp, vector<double>(nsp,0.0));
    vector<vector<double> > r_AD (nsp, vector<double>(nsp,0.0));
 
    int nb_interaction_level = 3;
 
    for (int interaction_level=2; interaction_level<2+nb_interaction_level; interaction_level++)
    {
-      //First copy last solution (r_AB if it is the first DRGEP step or r_AB_DRGEP if the EP has already been applied)
-      for (int ka=0; ka<nsp; ka++)
-      {
-         for (int kb=0; kb<nsp; kb++)
+      if (interaction_level>2) {
+         for (int ka=0; ka<nsp; ka++)
          {
-            if (interaction_level == 2) {
-               r_AD_intermediate[ka][kb] = r_AB[ka][kb];
-            }
-            else {
+            for (int kb=0; kb<nsp; kb++)
+            {
                r_AD_intermediate[ka][kb] = r_AD[ka][kb];
             }
          }
