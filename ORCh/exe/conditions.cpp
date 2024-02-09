@@ -213,6 +213,7 @@ void conditions(ORChInputs &inputs,
 		read_bool("WriteParts", &(inputs.writeAllPart), line);
 		
 		read_bool("drgepTraj", &(inputs.drgepTraj), line);
+		read_bool("trajR0", &(inputs.traj_rank0), line);
 		read_bool("Print_rAB", &(inputs.print_all_rAB), line);
 
 		read_string("mech", &(inputs.mech), line);

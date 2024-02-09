@@ -71,10 +71,23 @@ void computeMultipleInlet::getMultipleInlet(
 		
 		int Ifi = 0;
 		int Ila = 0;
+        int proc_offset = 0;
 		RecvCounts = new int[nproc];
 		Disp = new int[nproc];
 		for (int r=0; r<nproc; r++) Disp[r] = 0;
 		
+        if (inputs.traj_rank0) {
+            proc_offset = 1;
+            nproc -= 1;
+            RecvCounts[0] = 0;
+            //
+            if (rank == 0) {
+                Ila_rank = 0;
+                Ifi_rank = 0;
+                nb_var_loc = 0;
+            }
+        }
+
 		for (int r=0; r<nproc; r++)
 		{
 			if (r < nTot%nproc)
@@ -88,10 +101,10 @@ void computeMultipleInlet::getMultipleInlet(
 				Ila = (nTot/nproc)*r + (nTot/nproc) + nTot%nproc;
 			}
 			
-			RecvCounts[r] = (Ila-Ifi)*(nsp+1); //for Yks and T
-			for (int rb=r; rb<nproc-1; rb++) Disp[rb+1] += (Ila-Ifi)*(nsp+1);
+			RecvCounts[r+proc_offset] = (Ila-Ifi)*(nsp+1); //for Yks and T
+			for (int rb=r+proc_offset; rb<nproc-1+proc_offset; rb++) Disp[rb+1] += (Ila-Ifi)*(nsp+1);
 			
-			if (rank == r)
+			if (rank == r+proc_offset)
 			{
 				Ifi_rank = Ifi;
 				Ila_rank = Ila;
@@ -528,60 +541,113 @@ void computeMultipleInlet::getMultipleInlet(
 		} //END if(rank==0)
 		// =========== END FULL DATA PARTICLES ===========
 
-        //Mean values
-        for (int k=0; k<nsp; k++) Mean_Ym[k] = 0.0;
-        Mean_Hm = 0.0;
-        Mean_Tm = 0.0;
-        Total_gas_mass = 0.0;
-        for (int p=ndil; p<nTot; p++)
-        {
-            Total_gas_mass += listParticles[p]->m_P_gas_liquid; // m_P_gas_liquid for 1p = 1
-            for (int k=0; k<nsp; k++) Mean_Ym[k] += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_Yk_gas[k]);
-            Mean_Hm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_H_gas);
-            Mean_Tm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_T_gas);
+        if (inputs.drgepTraj || inputs.writeTraj) {
+            if (inputs.traj_rank0) {
+                if (rank==0) {
+                    //Mean values
+                    for (int k=0; k<nsp; k++) Mean_Ym[k] = 0.0;
+                    Mean_Hm = 0.0;
+                    Mean_Tm = 0.0;
+                    Total_gas_mass = 0.0;
+                    for (int p=ndil; p<nTot; p++)
+                    {
+                        Total_gas_mass += listParticles[p]->m_P_gas_liquid; // m_P_gas_liquid for 1p = 1
+                        for (int k=0; k<nsp; k++) Mean_Ym[k] += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_Yk_gas[k]);
+                        Mean_Hm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_H_gas);
+                        Mean_Tm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_T_gas);
+                    }
+                    for (int k=0; k<nsp; k++) Mean_Ym[k] /= Total_gas_mass;
+                    Mean_Hm /= Total_gas_mass;
+                    Mean_Tm /= Total_gas_mass; // DAK: should be H/Cp - not important, only postpro
+
+                    cout << endl;		
+                    cout << " Mean_Hm at ite " << i << " = " << Mean_Hm <<endl;
+                    cout << " Mean_Tm at ite " << i << " = " << Mean_Tm << endl;
+                }
+            } else {
+                //Mean values
+                for (int k=0; k<nsp; k++) Mean_Ym[k] = 0.0;
+                Mean_Hm = 0.0;
+                Mean_Tm = 0.0;
+                Total_gas_mass = 0.0;
+                for (int p=ndil; p<nTot; p++)
+                {
+                    Total_gas_mass += listParticles[p]->m_P_gas_liquid; // m_P_gas_liquid for 1p = 1
+                    for (int k=0; k<nsp; k++) Mean_Ym[k] += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_Yk_gas[k]);
+                    Mean_Hm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_H_gas);
+                    Mean_Tm += (listParticles[p]->m_P_gas_liquid*listParticles[p]->m_T_gas);
+                }
+                for (int k=0; k<nsp; k++) Mean_Ym[k] /= Total_gas_mass;
+                Mean_Hm /= Total_gas_mass;
+                Mean_Tm /= Total_gas_mass; // DAK: should be H/Cp - not important, only postpro
+                if(rank==0) 
+                {
+                    cout << endl;		
+                    cout << " Mean_Hm at ite " << i << " = " << Mean_Hm <<endl;
+                    cout << " Mean_Tm at ite " << i << " = " << Mean_Tm << endl;
+                }
+            }
         }
-        for (int k=0; k<nsp; k++) Mean_Ym[k] /= Total_gas_mass;
-        Mean_Hm /= Total_gas_mass;
-        Mean_Tm /= Total_gas_mass; // DAK: should be H/Cp - not important, only postpro
-	
-	    // Huu-Tri commented - 2020.03.06
-	    if(rank==0) 
-	    {
-		    cout << endl;		
-		    cout << " Mean_Hm at ite " << i << " = " << Mean_Hm <<endl;
-		    cout << " Mean_Tm at ite " << i << " = " << Mean_Tm << endl;
-	    }
 	
         // ====== LAGRANGIAN TRAJECTORIES - DETERMINISTIC ====== //
         if (inputs.drgepTraj || inputs.writeTraj) {
-            for (int n=0; n<nbInlets; n++)
-            {
-                for (int k=0; k<nsp; k++) Ym[k] = (Ym_Trajectories_store[n][i][k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
-                Hm = (Hm_Trajectories[n]-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
+            if (inputs.traj_rank0) {
+                if (rank==0) {
+                    for (int n=0; n<nbInlets; n++)
+                    {
+                        for (int k=0; k<nsp; k++) Ym[k] = (Ym_Trajectories_store[n][i][k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
+                        Hm = (Hm_Trajectories[n]-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
 
-                if ((step == "DRGEP_Species" || step == "DRGEP_Reactions") && inputs.drgepTraj)
-                {
-                    Next_Time_Step_with_drgep(Targets, Pressure, Ym, Hm, Tm, delta_t, R_AD_Trajectories[n], max_j_on_Target, step, inputs.print_all_rAB);
-                }
-                else if (step == "computeQSSCriteria")
-                {
-                    Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t, Production_Trajectories_ref, Consumption_Trajectories_ref, n, i);
-                }
-                else
-                {
-                    Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t);
-                }
-                // Huu-Tri TEST - 20210206
-                if(rank==0)
-                {
-                    cout << " **** Advance Deterministic inlet " << n << " at " << i << " iterations" << endl;
-                }
+                        if ((step == "DRGEP_Species" || step == "DRGEP_Reactions") && inputs.drgepTraj)
+                        {
+                            Next_Time_Step_with_drgep(Targets, Pressure, Ym, Hm, Tm, delta_t, R_AD_Trajectories[n], max_j_on_Target, step, inputs.print_all_rAB);
+                        }
+                        else if (step == "computeQSSCriteria")
+                        {
+                            Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t, Production_Trajectories_ref, Consumption_Trajectories_ref, n, i);
+                        }
+                        else
+                        {
+                            Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t);
+                        }
+                        cout << " **** Advance Deterministic inlet " << n << " at " << i << " iterations" << endl;
 
-                // Huu-Tri - After the reactor
-                for (int k=0; k<nsp; k++) Ym_Trajectories_store[n][i+1][k] = (Ym[k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
-                Hm_Trajectories[n] = (Hm-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
-                T_Trajectories_store[n][i+1] = Tm; // DAK : not consistent with H and Yk - not important (postpro only)
-            } // End "for" each inlet
+                        // Huu-Tri - After the reactor
+                        for (int k=0; k<nsp; k++) Ym_Trajectories_store[n][i+1][k] = (Ym[k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
+                        Hm_Trajectories[n] = (Hm-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
+                        T_Trajectories_store[n][i+1] = Tm; // DAK : not consistent with H and Yk - not important (postpro only)
+                    } // End "for" each inlet
+                }
+            } else {
+                for (int n=0; n<nbInlets; n++)
+                {
+                    for (int k=0; k<nsp; k++) Ym[k] = (Ym_Trajectories_store[n][i][k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
+                    Hm = (Hm_Trajectories[n]-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
+
+                    if ((step == "DRGEP_Species" || step == "DRGEP_Reactions") && inputs.drgepTraj)
+                    {
+                        Next_Time_Step_with_drgep(Targets, Pressure, Ym, Hm, Tm, delta_t, R_AD_Trajectories[n], max_j_on_Target, step, inputs.print_all_rAB);
+                    }
+                    else if (step == "computeQSSCriteria")
+                    {
+                        Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t, Production_Trajectories_ref, Consumption_Trajectories_ref, n, i);
+                    }
+                    else
+                    {
+                        Next_Time_Step(Pressure, Ym, Hm, Tm, delta_t);
+                    }
+                    // Huu-Tri TEST - 20210206
+                    if(rank==0)
+                    {
+                        cout << " **** Advance Deterministic inlet " << n << " at " << i << " iterations" << endl;
+                    }
+
+                    // Huu-Tri - After the reactor
+                    for (int k=0; k<nsp; k++) Ym_Trajectories_store[n][i+1][k] = (Ym[k]-Mean_Ym[k])*exp(-(delta_t/(2*tau_t)))+Mean_Ym[k];
+                    Hm_Trajectories[n] = (Hm-Mean_Hm)*exp(-(delta_t/(2*tau_t)))+Mean_Hm;
+                    T_Trajectories_store[n][i+1] = Tm; // DAK : not consistent with H and Yk - not important (postpro only)
+                } // End "for" each inlet
+            }
         }
         // ====== END LAGRANGIAN TRAJECTORIES - DETERMINISTIC ====== //
 		//
@@ -827,6 +893,38 @@ void computeMultipleInlet::getMultipleInlet(
                 for (int i = 0; i < nsp; i++) {
                     for (int j = 0; j < nreac; j++) {
                         max_j_on_Target[i][j] = recv_maxj[i*nreac+j];
+                    }
+                }
+            }
+        }
+    } else {
+        if (inputs.traj_rank0) {
+            if (step == "DRGEP_Species") {
+                int count = nbInlets*nsp*nsp;
+                //
+                if (rank==0) {
+                    double send_R_AD[count];
+                    //
+                    for (int i = 0; i < nsp; i++) {
+                        for (int j = 0; j < nsp; j++) {
+                            for (int p = 0; p < nbInlets; p++) {
+                                send_R_AD[p*nsp*nsp+i*nsp+j] = R_AD_Trajectories[p][i][j];
+                            }
+                        }
+                    }
+                    //
+                    MPI_Bcast(send_R_AD, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                } else {
+                    double recv_R_AD[count];
+                    //
+                    MPI_Bcast(recv_R_AD, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                    //
+                    for (int i = 0; i < nsp; i++) {
+                        for (int j = 0; j < nsp; j++) {
+                            for (int p = 0; p < nbInlets; p++) {
+                                R_AD_Trajectories[p][i][j] = recv_R_AD[p*nsp*nsp+i*nsp+j];
+                            }
+                        }
                     }
                 }
             }

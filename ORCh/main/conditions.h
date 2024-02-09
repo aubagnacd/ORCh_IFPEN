@@ -19,6 +19,7 @@ struct ORChInputs {
    bool writeAllPart; // write all particles data (only for MultipleInlet)
    bool drgepTraj; // do DRGEP on trajectories
    bool print_all_rAB; // print species inter-relations diagrams for all inlets/particles (depends on drgepTraj)
+   bool traj_rank0;
    double MixingTime;
    double TimeStep;
    double rMassFlowRate;
