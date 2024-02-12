@@ -25,19 +25,9 @@ PremixedFlames::~PremixedFlames() //Destructeur
 
 //---MultipleInlet---
 
-MultipleInlet::MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat) //Constructeur
-   :m_Temperature(Temperature), m_Pressure(Pressure), m_flowRate(flowRate), m_X_Species(X_Species), m_Y_Species(Y_Species), m_liquid(liquid), m_DropletsDiameter(DropletsDiameter), m_Tau_vj(Tau_vj), m_density_liquid(density_liquid), m_EvaporationLatentHeat(EvaporationLatentHeat)   
+MultipleInlet::MultipleInlet(bool equil, double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat) //Constructeur
+   :m_equil(equil), m_Temperature(Temperature), m_Pressure(Pressure), m_flowRate(flowRate), m_X_Species(X_Species), m_Y_Species(Y_Species), m_liquid(liquid), m_DropletsDiameter(DropletsDiameter), m_Tau_vj(Tau_vj), m_density_liquid(density_liquid), m_EvaporationLatentHeat(EvaporationLatentHeat)   
 {}
 
 MultipleInlet::~MultipleInlet() //Destructeur
-{}
-
-
-Characteristics_MultipleInlet::Characteristics_MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat,
-   bool BurnedGases) //Constructeur
-   :MultipleInlet(Temperature, Pressure, flowRate, X_Species, Y_Species, liquid, DropletsDiameter, Tau_vj, density_liquid, EvaporationLatentHeat),
-    m_BurnedGases(BurnedGases)   
-{}
-
-Characteristics_MultipleInlet::~Characteristics_MultipleInlet() //Destructeur
 {}

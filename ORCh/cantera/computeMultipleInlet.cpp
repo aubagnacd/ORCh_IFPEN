@@ -134,7 +134,7 @@ void computeMultipleInlet::getMultipleInlet(
     // Huu-Tri Nguyen - 20.01.2020
     if(rank==0) cout << "Time step = " << delta_t << " | Iterations = " << nbLines << " | Mixing time = " << tau_t << endl;
 
-    double Pressure =  dynamic_cast <Characteristics_MultipleInlet*> (listInlets[nbInlets-1])->m_Pressure;
+    double Pressure =  listInlets[nbInlets-1]->m_Pressure;
     double F =1.0;
 
     int Nmix = delta_t*nTot/tau_t;
@@ -243,8 +243,6 @@ void computeMultipleInlet::getMultipleInlet(
 
     //---Trajectories store---
     vector<double> Hm_Trajectories(nbInlets, 0.0);
-    vector<double> Zm_Trajectories(nbInlets, 0.0);
-    vector<double> Hm_inletIni(nbInlets, 0.0); // Save initial enthalpy of each inlet - Huu-Tri Nguyen - 16.01.2020
 
     vector<double> Ym(nsp,0.0);
     double Hm = 0.0;
@@ -255,6 +253,7 @@ void computeMultipleInlet::getMultipleInlet(
     //First create the Particles which will transport the gaseous and liquid phases
     vector<Particle*> listParticles;
 
+    double Tinlet;
     double Diameter_init; 
     double tau_vj;
     bool flagEvap = false;
@@ -267,38 +266,32 @@ void computeMultipleInlet::getMultipleInlet(
         }
         else if (listInlets[n]->m_Y_Species != "")
         {
-            if (rank == 0)
-            {
-                cout << "Set the mass fraction of inlet " << n << endl;
-            }
+            if (rank == 0) cout << "Set the mass fraction of inlet " << n << endl;
             mixture->setState_TPY(listInlets[n]->m_Temperature, listInlets[n]->m_Pressure, listInlets[n]->m_Y_Species);
         }
 
-        mixture->getMassFractions(&Ym[0]);
-        Hm  = mixture->enthalpy_mass();
-        vector<double> Y_transfer (nsp, 0.0);
-        for (int k=0; k<nsp; k++) Y_transfer[k] = Ym[k];
-        density = mixture->density();
-
-        for (int k=0; k<nsp; k++)
-        {
-            if (Ym[k] > 0.0)
+        if (listInlets[n]->m_equil) {
+            ChemEquil c;
+		    c.equilibrate(*mixture,"HP");
+            mixture->getMassFractions(&Ym[0]);
+        } else {
+            mixture->getMassFractions(&Ym[0]);
+            for (int k=0; k<nsp; k++)
             {
-                SpeciesIntoReactants[k] = true;
+                if (Ym[k] > 0.0) SpeciesIntoReactants[k] = true;
             }
         }
-	    
-        Hm_inletIni[n] = Hm; // Save initial enthalpy of each inlet - Huu-Tri Nguyen - 16.01.2020
-	    if(rank ==0) cout << "Hm initial inlet " << n << " = " << Hm_inletIni[n] << endl;
 
-        if (n < nbInlets)  
-        {
-            //Composition space Lagrangian trajectories
-            for (int k=0; k<nsp; k++) Ym_Trajectories_store[n][0][k] = Y_transfer[k];
- 
-            Hm_Trajectories[n] = Hm;
-            T_Trajectories_store[n][0] = listInlets[n]->m_Temperature;
-        }
+        Tinlet = mixture->temperature();
+        Hm  = mixture->enthalpy_mass();
+        density = mixture->density();
+	    
+	    if(rank ==0) cout << "Hm initial inlet " << n << " = " << Hm << endl;
+
+        //Composition space Lagrangian trajectories
+        for (int k=0; k<nsp; k++) Ym_Trajectories_store[n][0][k] = Ym[k];
+        Hm_Trajectories[n] = Hm;
+        T_Trajectories_store[n][0] = Tinlet;
 	
         for (int i=0; i<nbParticles[n]; i++)
         {
@@ -307,15 +300,15 @@ void computeMultipleInlet::getMultipleInlet(
                 flagEvap = true;
                 double nbDroplets = Particle_flowRate/(listInlets[n]->m_density_liquid*(PI/6)*pow(listInlets[n]->m_DropletsDiameter,3.0));
                 listParticles.push_back(new Particle(
-                        Y_transfer, 
-                        listInlets[n]->m_Temperature, 
+                        Ym, 
+                        Tinlet, 
                         Hm, 
                         1, 
                         0.0, 
                         nbDroplets, 
                         listInlets[n]->m_DropletsDiameter, 
                         0.001 /*0.01% gas, 99.9% liquid*/, 
-			            Y_transfer, 
+			            Ym, 
                         listInlets[n]->m_density_liquid, 
                         listInlets[n]->m_EvaporationLatentHeat));
 
@@ -325,8 +318,8 @@ void computeMultipleInlet::getMultipleInlet(
             else
             {
                 listParticles.push_back(new Particle(
-                        Y_transfer, 
-                        listInlets[n]->m_Temperature, 
+                        Ym, 
+                        Tinlet, 
                         Hm, 
                         0, 
                         density, 
@@ -587,6 +580,8 @@ void computeMultipleInlet::getMultipleInlet(
                     cout << " Mean_Tm at ite " << i << " = " << Mean_Tm << endl;
                 }
             }
+        } else {
+            if(rank==0) cout << " ite " << i << endl;
         }
 	
         // ====== LAGRANGIAN TRAJECTORIES - DETERMINISTIC ====== //

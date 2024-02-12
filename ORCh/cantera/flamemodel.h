@@ -49,12 +49,13 @@ class MultipleInlet
 {
    public:
    //constructeur
-   MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat);
+   MultipleInlet(bool equil, double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat);
 
    //destructeur
    virtual ~MultipleInlet();
 
    public:
+   bool m_equil;
    double m_Temperature;
    double m_Pressure;
    double m_flowRate;
@@ -66,21 +67,6 @@ class MultipleInlet
    double m_density_liquid; //[kg/m3]
    double m_EvaporationLatentHeat; //[J/kg]
 
-};
-
-//--------------------
-class Characteristics_MultipleInlet : public MultipleInlet
-{
-   public:
-   //constructeur
-   Characteristics_MultipleInlet(double Temperature, double Pressure, double flowRate, string X_Species, string Y_Species, bool liquid, double DropletsDiameter, double Tau_vj, double density_liquid, double EvaporationLatentHeat, 
-                                 bool BurnedGases);
-
-   //destructeur
-   virtual ~Characteristics_MultipleInlet();
-
-   public:
-   bool m_BurnedGases;
 };
 
 //--------------------

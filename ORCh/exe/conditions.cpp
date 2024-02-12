@@ -133,18 +133,6 @@ void read_vector_inlet(string key, vector<MultipleInlet*> *listInlets, MultipleI
 	}
 }
 
-void read_vector_inletGB(string key, vector<MultipleInlet*> *listInlets, Characteristics_MultipleInlet* MGB, string line)
-{
-	stringstream s_line;
-	s_line << line;
-	string k;
-	s_line >> k;
-	if (k == key)
-	{
-		(*listInlets).push_back(MGB);
-	}
-}
-
 void conditions(ORChInputs &inputs,
 	vector<MultipleInlet*> &listInlets, //List of flames with their characteristics for the multiple inlet problem
 	vector<PremixedFlames*> &listFlames, //List of premixed flames with their characteristics
@@ -169,6 +157,7 @@ void conditions(ORChInputs &inputs,
 	string Final_flame = "";
 	
 	//Inlet parameters
+	bool equil = false;
 	double T=0.0;
 	double MassFlowRate = 0.0;
 	string Yk = "";
@@ -178,8 +167,7 @@ void conditions(ORChInputs &inputs,
 	double EvaporationTime = 0.0;
 	double liquidDensity = 0.0;
 	double EvaporationLatentHeat = 0.0;
-	MultipleInlet* MI; 
-	Characteristics_MultipleInlet* MGB;
+	MultipleInlet* MI;
 	
 	int nbFlame=0;
 	int nbInlet=0;
@@ -233,6 +221,7 @@ void conditions(ORChInputs &inputs,
 		}
 		
 		if (inputs.configuration == "MultipleInlet") {
+			read_bool("equil", &equil, line);
 			read_double("T", &T, line);
 			read_double("MassFlowRate", &MassFlowRate, line);
 			read_double("Pressure", &P, line);
@@ -269,18 +258,10 @@ void conditions(ORChInputs &inputs,
 		{
 			nbInlet++;
 			bool isEvap = (EvaporationModel > 0)?true:false;
-			MI = new MultipleInlet(T, P, MassFlowRate, Xk, Yk, isEvap, DropletDiameter, EvaporationTime, liquidDensity, EvaporationLatentHeat);
+			MI = new MultipleInlet(equil, T, P, MassFlowRate, Xk, Yk, isEvap, DropletDiameter, EvaporationTime, liquidDensity, EvaporationLatentHeat);
 			read_vector_inlet("//EndInlet", &listInlets, MI, line);
 		}
-		
-		//Inlet of Burned Gases
-		if (line == "//EndInletGB")
-		{
-			nbInlet++;
-			bool isEvap = (EvaporationModel > 0)?true:false;
-			MGB = new Characteristics_MultipleInlet(T, P, MassFlowRate, Xk, Yk, isEvap, DropletDiameter, EvaporationTime, liquidDensity, EvaporationLatentHeat, true);
-			read_vector_inletGB("//EndInletGB", &listInlets, MGB, line);
-		}
+
 		read_vector("listTargets", &listTargets, line);
 		
 		read_vector("QSS", &array1, line);
