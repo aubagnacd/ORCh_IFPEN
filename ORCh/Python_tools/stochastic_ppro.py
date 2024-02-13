@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import cantera as ct
 import pandas as pd
+import os, time
 #
 def get_filename(file_type,case,nsp,nreac):
 	if (file_type == "Stochastic"):
@@ -24,16 +25,19 @@ class Particle: # functions related to local particle composition/conditions
 		self.Z = np.float64(-1.0)
 		self.Yk = np.zeros(nsp,np.double)
 		#
+		self.gas = gas
+		#
 		self.beta_ox = np.float64(0.0)
 		self.rbeta = np.float64(0.0) # 1.0/(beta_fuel - beta_ox)
 		self.Zst = np.float64(0.0)
 		self.Zphi = np.empty((0,1),np.float64)
-		self.initZ(nsp, gas, fuel)
+		self.initZ(nsp, fuel)
 	#
-	def initZ(self,nsp, gas, fuel):
+	def initZ(self,nsp, fuel):
 		#
 		# Compute beta_fuel and get surrogate mean composition
 		#
+		gas = self.gas
 		gas.TPX = 300.0, 1.0e5, fuel
 		nfuel = fuel.count(":")
 		self.wc = gas.atomic_weight("C")
@@ -89,14 +93,21 @@ class Particle: # functions related to local particle composition/conditions
 			beta = np.float64(zc/(self.cc*self.wc) + zh/(self.ch*self.wh) - 2.0*zo/((self.co+2.0*(self.cc+0.25*self.ch-0.5*self.co))*self.wo))
 			Zloc = (beta - self.beta_ox)*self.rbeta
 			self.Zphi = np.append(self.Zphi,Zloc)
-	#
-	def calcZ(self, gas):
-		gas.TPY = self.T, 1.0e5, self.Yk
+	#	
+	def calcZ(self, Yk):
+		gas = self.gas
+		gas.TPY = Yk[-1], 1.0e5, Yk[:-1]
 		zc = gas.elemental_mass_fraction("C")
 		zh = gas.elemental_mass_fraction("H")
 		zo = gas.elemental_mass_fraction("O")
 		beta = np.float64(zc/(self.cc*self.wc) + zh/(self.ch*self.wh) - 2.0*zo/((self.co+2.0*(self.cc+0.25*self.ch-0.5*self.co))*self.wo))
 		self.Z = (beta - self.beta_ox)*self.rbeta
+
+		return self.Z
+#
+#
+#
+start = time.time()
 # -------------------------------------------------------------------------
 # Inputs start
 # -------------------------------------------------------------------------
@@ -104,18 +115,21 @@ ppro_type = "Stochastic"
 mech = 'mechanisms/gri12.xml' # user input - initial mech for this step
 case = "drgep_species" # user input - drgep species / drgep reaction
 fuel = "CH4:1.0" # user input - could be read from input.ini
-Tmin, Tmax = 300.0, 2600.0 # temperature range to plot
+Tmin, Tmax = 273.0, 2600.0 # temperature range to plot
 # --------------------------------------------------------------------------
 # Inputs end
 # --------------------------------------------------------------------------
 gas = ct.Solution(mech)
 nsp = gas.n_species
 nreac = gas.n_reactions
-indPAH = gas.species_index("C2H2")
+color_spec_name = "C2H2"
+threshold = np.float64(1.0e-10)
+local_part = Particle(nsp,gas,fuel)
 #
 # Get filenames and read files
 #
-local_part = Particle(nsp,gas,fuel)
+if not os.path.exists("TZ_plots"):
+   os.makedirs("TZ_plots")
 # Stochastic
 filename = get_filename(ppro_type,case,nsp,nreac)
 df = pd.read_csv(filename, delim_whitespace=True)
@@ -129,26 +143,17 @@ dt = df[df["#Time"] > 0.0].loc[:,"#Time"].min()
 #
 Zhist = np.empty((0,1),np.float64)
 Thist = np.empty((0,1),np.float64)
+col_name_array = gas.species_names
+col_name_array.append("Temperature")
 for i in range(ntimesteps):
 	local_df = df.loc[i*nparts:(i+1)*nparts-1,:]
 	#
-	Z = np.empty((0,1),np.float64)
-	PAH = np.empty((0,1),np.float64)
 	T = local_df["Temperature"].values
+	Z = np.apply_along_axis(local_part.calcZ, 1, local_df[col_name_array].values)
+	cspec = local_df[color_spec_name].values
+	cspec[cspec < threshold] = threshold
 	#
-	# Read stochastic particles composition
-	#
-	for j in range(nparts):
-		local_part.Yk = local_df.loc[local_df["Particle_number"] == j,gas.species_names].values
-		local_part.T = T[j]
-		local_part.calcZ(gas)
-		#
-		# Add particle to matplotlib scatterplot
-		#
-		Z = np.append(Z,local_part.Z)
-		PAH = np.append(PAH, np.max((np.float64(1.0e-10),local_part.Yk[0][indPAH])))
-	#
-	# Save Z and T
+	# Save Z and T history
 	#
 	Zhist = np.append(Zhist,Z)
 	Thist = np.append(Thist,T)
@@ -157,7 +162,7 @@ for i in range(ntimesteps):
 	#
 	fig, ax = plt.subplots()
 	ax.scatter(Zhist,Thist, c = '0.7', s = 25)
-	sc = ax.scatter(Z, T, c=PAH, s=15, norm=colors.LogNorm(vmin=1.0e-6, vmax=1.0e-1), cmap='inferno')
+	sc = ax.scatter(Z, T, c=cspec, s=15, norm=colors.LogNorm(vmin=1.0e-6, vmax=1.0e-1), cmap='inferno')
 	ax.set_ylabel(r"$T$ $[K]$")
 	ax.set_xlabel(r"$Z$ $[-]$")
 	ax.vlines(local_part.Zst,300.0,3000.0)
@@ -168,6 +173,9 @@ for i in range(ntimesteps):
 	plt.ylim(Tmin,Tmax)
 	plt.colorbar(sc)
 	fig.tight_layout()
-	fig.savefig("./TZ_plot_"+str(i)+".png")
+	fig.savefig("./TZ_plots/TZ_plot_"+str(i)+".png")
 	plt.close()
 	print("plotted time_steps "+str(i))
+
+end = time.time()
+print(f"duration : {end-start:f}")
