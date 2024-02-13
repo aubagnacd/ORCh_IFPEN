@@ -191,7 +191,15 @@ void drgepSpecies(ORChInputs inputs, vector<MultipleInlet*> listInlets, vector<P
            vector<double> (nreac_init, 0.0),
            vector<Species_ORCh*> (),
            vector<Reaction_ORCh*> ());
+   }
 
+   for (int nbSpeciesToKeep=nsp_init-1; nbSpeciesToKeep>9; nbSpeciesToKeep--)
+   {
+      string outputSchemeName = "./outputs/mechanisms/drgepSpecies";
+      stringstream s_nbSpeciesToKeep;
+      s_nbSpeciesToKeep << nbSpeciesToKeep;
+      outputSchemeName.append(s_nbSpeciesToKeep.str()).append(".xml");
+      
       if (inputs.configuration == "MultipleInlet")
       {
          vector<vector<vector<double> > > Ym_Trajectories (nbInlets, vector<vector<double> > (nbIterations+1, vector<double> (nbSpeciesToKeep, 0.0)));
@@ -211,8 +219,6 @@ void drgepSpecies(ORChInputs inputs, vector<MultipleInlet*> listInlets, vector<P
                Consumption_Trajectories_ref, 
                T_Trajectories, 
                SpeciesIntoReactants);
-         
-         cout << "done second multipleinlet call" << endl;
       } //end if configuration == "MultipleInlet"
 
       if (inputs.configuration == "PremixedFlames")
