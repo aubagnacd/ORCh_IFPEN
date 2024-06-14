@@ -5,7 +5,7 @@
 #include <mpi.h>
 #include <algorithm>
 
-
+#include <regex>
 
 //Conditions for the reduction 
 #include "conditions.h"

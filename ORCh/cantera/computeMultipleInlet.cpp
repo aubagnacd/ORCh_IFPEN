@@ -33,7 +33,7 @@ void computeMultipleInlet::getMultipleInlet(
    vector<vector<double> > &T_Trajectories_store,
    vector<bool> &SpeciesIntoReactants)
 {
-    mixture  = new IdealGasMix(mech,inputs.mech_desc);
+    mixture  = new IdealGasMix(mech);
     int nsp = mixture->nSpecies();
     int nbInlets = listInlets.size();
 	int nreac = mixture->nReactions();

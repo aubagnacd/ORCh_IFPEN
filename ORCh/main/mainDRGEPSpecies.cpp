@@ -164,47 +164,52 @@ void drgepSpecies(ORChInputs inputs, vector<MultipleInlet*> listInlets, vector<P
 
    log.close();
 
-   if (rank ==0) cout << "--------------------------------" << endl << endl;
 
-
-   for (int nbSpeciesToKeep=nsp_init-1; nbSpeciesToKeep>9; nbSpeciesToKeep--)
-   {
-      vector<bool> Species_to_add (nsp_init, false);
-      vector<bool> Reactions_to_add (nreac_init, true);
-
-      for (int k=0; k<nbSpeciesToKeep; k++) Species_to_add[int(sort_R_AD[nsp_init-1-k][1])] = true;
-
-      string outputSchemeName = "./outputs/mechanisms/drgepSpecies";
-      stringstream s_nbSpeciesToKeep;
-      s_nbSpeciesToKeep << nbSpeciesToKeep;
-      outputSchemeName.append(s_nbSpeciesToKeep.str()).append(".xml");
-
-      Write *w = new Write();
-      w->Write_xml_file(inputs.mech,
-           inputs.mech_desc,
-           outputSchemeName,
-           Species_to_add,
-           Reactions_to_add,
-           false, 
-           vector<double> (nreac_init, 0.0),
-           vector<double> (nreac_init, 0.0),
-           vector<double> (nreac_init, 0.0),
-           vector<Species_ORCh*> (),
-           vector<Reaction_ORCh*> ());
+   string outputSchemeName;
+   int nTarg = 0;
+   for (int i = 0; i < Targets.size(); i++) {
+      nTarg += Targets[i] ? 1 : 0;
+   }
+   int Nmin = max(9, nTarg);
+   //
+   if (rank ==0) {
+      string konsole_script;
+      ofstream writer_inputs_file;
+      string writer_inputs_filename = "inputs.in";
+      string yaml_mech = std::regex_replace(inputs.mech,std::regex(".xml"), ".yaml");
+      //
+      for (int nbSpeciesToKeep=nsp_init-1; nbSpeciesToKeep>Nmin; nbSpeciesToKeep--)
+      {
+            outputSchemeName = " ./outputs/mechanisms/drgepSpecies";
+            stringstream s_nbSpeciesToKeep; s_nbSpeciesToKeep << nbSpeciesToKeep;
+            outputSchemeName.append(s_nbSpeciesToKeep.str());
+            writer_inputs_file.open(writer_inputs_filename, ios::out | ios::trunc); 
+            writer_inputs_file << yaml_mech << " orch " << nbSpeciesToKeep << outputSchemeName << endl;
+            writer_inputs_file.close();
+            //
+            konsole_script = "python submech_writer.py";
+            system(konsole_script.c_str());
+            konsole_script = "sed -i \'/dispersion_coefficient/d\' ";
+            konsole_script.append(outputSchemeName).append(".xml");
+            system(konsole_script.c_str());
+            konsole_script = "sed -i \'/quadrupole_polarizability/d\' ";
+            konsole_script.append(outputSchemeName).append(".xml");
+            system(konsole_script.c_str());
+      }
    }
 
-   for (int nbSpeciesToKeep=nsp_init-1; nbSpeciesToKeep>9; nbSpeciesToKeep--)
+   MPI_Barrier(MPI_COMM_WORLD);
+
+   for (int nbSpeciesToKeep=nsp_init-1; nbSpeciesToKeep>Nmin; nbSpeciesToKeep--)
    {
-      string outputSchemeName = "./outputs/mechanisms/drgepSpecies";
-      stringstream s_nbSpeciesToKeep;
-      s_nbSpeciesToKeep << nbSpeciesToKeep;
+      outputSchemeName = "./outputs/mechanisms/drgepSpecies";
+      stringstream s_nbSpeciesToKeep; s_nbSpeciesToKeep << nbSpeciesToKeep;
       outputSchemeName.append(s_nbSpeciesToKeep.str()).append(".xml");
       
       if (inputs.configuration == "MultipleInlet")
       {
          vector<vector<vector<double> > > Ym_Trajectories (nbInlets, vector<vector<double> > (nbIterations+1, vector<double> (nbSpeciesToKeep, 0.0)));
          vector<vector<double> > T_Trajectories (nbInlets, vector<double> (nbIterations+1, 0.0));
-
          computeMultipleInlet *c = new computeMultipleInlet();
          c->getMultipleInlet(inputs,
                outputSchemeName,

@@ -9,11 +9,13 @@ Tests/*/mainProgram
 Tests/*/*.log
 Tests/*/*.dat
 Tests/*/outputs/*
+Tests/*/tmp_mech.yaml
 
 ORCh/cppflow
 ORCh/*/*.o
 ORCh/emst/*.mod
 ORCh/exe/mainProgram
+ORCh/Python_tools/__pycache__
 
 Cantera/build
 Cantera/.sconf_temp
