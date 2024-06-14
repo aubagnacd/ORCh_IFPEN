@@ -5,6 +5,8 @@ import cantera as ct
 import os, time
 # from copy import deepcopy
 #
+ct.suppress_thermo_warnings()
+#
 def get_filename(file_type,case,nsp,nreac):
 	if (file_type == "Stochastic"):
 		if (case == "drgep_species"):
@@ -114,6 +116,7 @@ ppro_type = "Stochastic"
 case = "drgep_species" # user input - drgep species / drgep reaction
 fuel = "CH4:1.0" # user input - could be read from input.ini
 eps = np.float64(1.0e-6)
+to_check = [12,18,24] # "-1" for all reduced mechs from "mech", N to begin with N species mechanism, or directly a list(int) of mech to compare
 species_to_plot = ["CO2","H2O","CO"]
 # PAH_to_plot = []
 # Tcut = 1400.0
@@ -179,7 +182,12 @@ for i in range(ntimesteps):
 #
 # Loop on mechanisms versions (species or reactions)
 #
-mech_range = nsp if (case == "drgep_species") else nreac
+if isinstance(to_check,list):
+	mech_range = to_check
+else:
+	mech_range = to_check if to_check > 0 else (nsp if (case == "drgep_species") else nreac)
+	mech_range = list(reversed(range(mech_range)))
+
 Terror = np.empty((0,1),np.float64)
 Tmean = np.empty((0,1),np.float64)
 T99 = np.empty((0,1),np.float64)
@@ -191,8 +199,7 @@ tmp_error = np.zeros(n2plot)
 # tmp_PAHerror = np.zeros(nPAH2plot)
 #
 nred_list = np.empty((0,1),np.int32)
-for ired in range(mech_range):
-	nred = mech_range - ired - 1
+for nred in mech_range:
 	errY = np.zeros((ntimesteps,nparts,n2plot))
 	# errYPAH = np.zeros((ntimesteps,nparts,nPAH2plot))
 	errT = np.zeros((ntimesteps,nparts))
@@ -235,7 +242,8 @@ for ired in range(mech_range):
 					# T --> simple relative error
 					errT[i,:] = np.abs(T[i,:]-Tref[i,:]) / Tref[i,:]
 					# Y --> relative error if ref values superior than threshold (eps) and current value superior than 1% of max at this mixture fraction (Z)
-					errY[i,:,:] = np.divide(np.abs(Y[i,:,:]-Yref[i,:,:]), Yref[i,:,:], out=np.zeros_like(Y[i,:,:]), where=((Yref[i,:,:] > eps) & (Y[i,:,:] > Ymax[Zind[i,:],:]*1.0e-2)))
+					errY[i,:,:] = np.divide(2.0*np.abs(Y[i,:,:]-Yref[i,:,:]), np.abs(Yref[i,:,:])+np.abs(Y[i,:,:]), out=np.zeros_like(Y[i,:,:]), where=((Yref[i,:,:] > eps) & (Y[i,:,:] > Ymax[Zind[i,:],:]*1.0e-2)))
+					errY[i,:,:] = np.divide(errY[i,:,:]+2.0, 2.0-errY[i,:,:], out=np.zeros_like(Y[i,:,:]), where=((Yref[i,:,:] > eps) & (Y[i,:,:] > Ymax[Zind[i,:],:]*1.0e-2)))
 					# PAH --> to be done (like Y + Z/T constraint)
 					# errYPAH[i,:,:] = np.divide(np.abs(YPAH[i,:,:]-YPAHref[i,:,:]), YPAHref[i,:,:], out=np.zeros_like(YPAH[i,:,:]), where=(Z[i,:] > Zcut) & (T[i,:] > Tcut) & (YPAHref[i,:,:] > eps) & (YPAH[i,:,:] > YPAHmax[Zind[i,:],:]*1.0e-2))
 					# Z --> simple relative error (Z can be null), only sanity check (Z error should be close to 0 at any time)
